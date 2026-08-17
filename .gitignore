@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+pareto-env/
+*.log
+nohup.out
+.env
+kubeconfig
+*.kubeconfig
+results/*.csv
+.DS_Store

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Edge-Core Orchestrator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f16; --panel:#141b26; --panel2:#1b2432; --line:#25303f;
+    --txt:#e8eef7; --dim:#7b8a9e; --accent:#4da3ff;
+    --ok:#3ddc84; --warn:#ffb648; --bad:#ff5f5f;
+    --edge:#3ddc84; --core:#4da3ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);
+       font:15px/1.4 "Inter",system-ui,-apple-system,sans-serif;padding:14px}
+  .mono{font-family:"JetBrains Mono",Consolas,monospace}
+
+  header{display:flex;align-items:center;gap:26px;
+         background:var(--panel);border:1px solid var(--line);
+         border-radius:10px;padding:12px 18px;margin-bottom:12px}
+  header h1{font-size:19px;font-weight:700;letter-spacing:.3px}
+  .stat{display:flex;flex-direction:column;line-height:1.15}
+  .stat .v{font-size:26px;font-weight:700}
+  .stat .k{font-size:11px;color:var(--dim);text-transform:uppercase;
+           letter-spacing:1.1px}
+  .spacer{flex:1}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;
+       margin-right:7px;vertical-align:middle}
+  .pol{background:var(--panel2);border:1px solid var(--line);
+       border-radius:6px;padding:5px 12px;font-size:13px}
+
+  .grid{display:grid;grid-template-columns:1.15fr 1fr;
+        grid-template-rows:auto auto;gap:12px}
+  .panel{background:var(--panel);border:1px solid var(--line);
+         border-radius:10px;padding:14px}
+  .panel h2{font-size:12px;color:var(--dim);text-transform:uppercase;
+            letter-spacing:1.3px;margin-bottom:12px;font-weight:600}
+
+  .tiers{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;
+         align-items:start}
+  .tier-label{font-size:11px;color:var(--dim);letter-spacing:1.2px;
+              text-transform:uppercase;margin-bottom:8px}
+  .divider{width:1px;background:var(--line);align-self:stretch;
+           min-height:180px}
+  .node{background:var(--panel2);border:1px solid var(--line);
+        border-radius:9px;padding:11px;margin-bottom:10px;
+        border-left:3px solid var(--edge)}
+  .node.core{border-left-color:var(--core)}
+  .node.down{opacity:.4;border-left-color:var(--bad)}
+  .node .top{display:flex;justify-content:space-between;
+             align-items:baseline;margin-bottom:3px}
+  .node .nm{font-weight:700;font-size:15px}
+  .node .lat{font-size:13px;color:var(--accent);font-weight:600}
+  .node .meta{font-size:11px;color:var(--dim);margin-bottom:8px}
+  .bar{height:7px;background:#0d131c;border-radius:4px;overflow:hidden;
+       margin-bottom:3px}
+  .bar > div{height:100%;border-radius:4px;transition:width .35s ease}
+  .util{font-size:11px;color:var(--dim);margin-bottom:8px}
+  .pills{display:flex;flex-wrap:wrap;gap:5px;min-height:24px}
+  .pill{background:#0d131c;border:1px solid var(--line);border-radius:20px;
+        padding:3px 11px;font-size:12px}
+  .pill.breach{border-color:var(--bad);color:var(--bad)}
+  .pill.flash{animation:fl 1.5s ease}
+  @keyframes fl{0%{background:var(--accent);color:#04121f;
+                   transform:scale(1.16)}100%{}}
+  .badge{background:var(--bad);color:#fff;border-radius:4px;
+         padding:1px 6px;font-size:10px;font-weight:700}
+
+  #log{background:#080c12;border:1px solid var(--line);border-radius:8px;
+       padding:11px;height:250px;overflow-y:auto;font-size:12.5px;
+       white-space:pre;line-height:1.55}
+  #log .mig{color:var(--accent);font-weight:600}
+  #log .sub{color:var(--dim)}
+
+  .cap{font-size:12px;color:var(--dim);margin-top:9px;text-align:center}
+  .empty{color:var(--dim);text-align:center;padding:34px;font-size:14px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Edge-Core Orchestrator</h1>
+  <div class="stat"><span class="v" id="s-cost">&mdash;</span><span class="k">&#8377; / hour</span></div>
+  <div class="stat"><span class="v" id="s-pow">&mdash;</span><span class="k">watts</span></div>
+  <div class="stat"><span class="v" id="s-viol">&mdash;</span><span class="k">SLA breaches</span></div>
+  <div class="stat"><span class="v" id="s-nodes">&mdash;</span><span class="k">nodes ready</span></div>
+  <div class="spacer"></div>
+  <div class="pol">policy: <b id="s-policy">&mdash;</b></div>
+  <div><span class="dot" id="s-dot"></span><span id="s-conn" style="font-size:13px">connecting</span></div>
+</header>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Cluster Topology</h2>
+    <div class="tiers">
+      <div><div class="tier-label">Edge &middot; near &amp; costly</div><div id="edge-col"></div></div>
+      <div class="divider"></div>
+      <div><div class="tier-label">Core &middot; far &amp; cheap</div><div id="core-col"></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>p99 Latency vs SLA</h2>
+    <canvas id="chart-lat" height="215"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>Pareto Front &mdash; non-dominated placements</h2>
+    <canvas id="chart-front" height="215"></canvas>
+    <div class="cap" id="front-cap">&mdash;</div>
+  </div>
+
+  <div class="panel">
+    <h2>Decision Log</h2>
+    <div id="log" class="mono"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = ["#4da3ff","#3ddc84","#ffb648","#c77dff","#ff5f5f"];
+let prevNode = {};
+let latChart, frontChart;
+
+function initCharts(){
+  const gridC = "#25303f", tickC = "#7b8a9e";
+
+  latChart = new Chart(document.getElementById("chart-lat"), {
+    type:"line",
+    data:{datasets:[]},
+    options:{
+      animation:false, responsive:true, maintainAspectRatio:false,
+      parsing:false, interaction:{intersect:false,mode:"nearest"},
+      scales:{
+        x:{type:"linear", ticks:{color:tickC, callback:v=>v+"s"},
+           grid:{color:gridC}, title:{display:true,text:"seconds ago",
+           color:tickC, font:{size:11}}},
+        y:{beginAtZero:true, ticks:{color:tickC}, grid:{color:gridC},
+           title:{display:true,text:"p99 latency (ms)",color:tickC,
+           font:{size:11}}}
+      },
+      plugins:{legend:{labels:{color:"#e8eef7",boxWidth:12,
+                filter:i=>!i.text.endsWith(" SLA")}}}
+    }
+  });
+
+  frontChart = new Chart(document.getElementById("chart-front"), {
+    type:"scatter",
+    data:{datasets:[]},
+    options:{
+      animation:false, responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ticks:{color:tickC},grid:{color:gridC},
+           title:{display:true,text:"cost (\u20B9/hr)",color:tickC,font:{size:11}}},
+        y:{ticks:{color:tickC},grid:{color:gridC},
+           title:{display:true,text:"",color:tickC,font:{size:11}}}
+      },
+      plugins:{
+        legend:{labels:{color:"#e8eef7",boxWidth:12}},
+        tooltip:{callbacks:{label:c=>{
+          const d=c.raw.meta;
+          return ["violations: "+d.sla_violations,
+                  "cost: \u20B9"+d.cost_per_hr+"/hr",
+                  "power: "+d.power_w+"W",
+                  "migrations: "+d.migration_cost,
+                  "\u2500\u2500\u2500\u2500\u2500",
+                  ...Object.entries(d.placement||{}).map(([w,n])=>w+" \u2192 "+n)];
+        }}}
+      }
+    }
+  });
+}
+
+function renderNodes(nodes, workloads){
+  const byNode = {};
+  Object.entries(workloads).forEach(([w,d])=>{
+    (byNode[d.node] = byNode[d.node] || []).push([w,d]);
+  });
+
+  const cols = {edge:[], core:[]};
+  Object.entries(nodes).forEach(([name,n])=>{
+    const u = n.cpu_util || 0;
+    const col = u>0.9 ? "var(--bad)" : u>0.7 ? "var(--warn)" : "var(--ok)";
+    const pills = (byNode[name]||[]).map(([w,d])=>{
+      const moved = prevNode[w] && prevNode[w] !== d.node;
+      const breach = d.p99_ms > d.sla_ms;
+      return '<span class="pill'+(breach?" breach":"")+(moved?" flash":"")+'">'
+           + w+" \u00B7 "+d.p99_ms+"ms</span>";
+    }).join("");
+
+    cols[n.tier].push(
+      '<div class="node '+n.tier+(n.ready?"":" down")+'">'
+      + '<div class="top"><span class="nm">'+name+" "
+      + (n.ready?"":'<span class="badge">DOWN</span>')
+      + '</span><span class="lat">'+n.base_latency_ms+' ms</span></div>'
+      + '<div class="meta">'+n.zone+" \u00B7 "+n.cpu_cores+" cores \u00B7 \u20B9"
+      + n.cost_per_hr+"/hr \u00B7 "+Math.round(n.power_w)+"W</div>"
+      + '<div class="bar"><div style="width:'+Math.min(u*100,100)
+      + '%;background:'+col+'"></div></div>'
+      + '<div class="util">CPU '+(u*100).toFixed(0)+'%</div>'
+      + '<div class="pills">'+(n.ready?pills:"")+'</div></div>');
+  });
+
+  document.getElementById("edge-col").innerHTML = cols.edge.join("") || "";
+  document.getElementById("core-col").innerHTML = cols.core.join("") || "";
+  Object.entries(workloads).forEach(([w,d])=>prevNode[w]=d.node);
+}
+
+function renderLatency(history, workloads){
+  if(!history.length){ latChart.data.datasets=[]; latChart.update(); return; }
+  const now = history[history.length-1].t;
+  const names = Object.keys(workloads);
+  const ds = [];
+
+  names.forEach((w,i)=>{
+    const c = COLORS[i % COLORS.length];
+    ds.push({
+      label:w, borderColor:c, backgroundColor:c, borderWidth:2,
+      pointRadius:0, tension:.25,
+      data:history.filter(h=>h.workloads[w]!=null)
+                  .map(h=>({x:+(h.t-now).toFixed(1), y:h.workloads[w]}))
+    });
+    ds.push({
+      label:w+" SLA", borderColor:c, borderWidth:1.5, borderDash:[7,5],
+      pointRadius:0,
+      data:[{x:-60,y:workloads[w].sla_ms},{x:0,y:workloads[w].sla_ms}]
+    });
+  });
+
+  latChart.data.datasets = ds;
+  const vis = history.flatMap(h=>Object.values(h.workloads));
+  const bounds = names.map(w=>workloads[w].sla_ms).filter(v=>v<=200);
+  latChart.options.scales.y.suggestedMax =
+      Math.max.apply(null, vis.concat(bounds).concat([30])) * 1.25;
+  latChart.update();
+}
+
+function renderFront(front, policy){
+  const cap = document.getElementById("front-cap");
+  if(!front || !front.length){
+    frontChart.data.datasets=[]; frontChart.update();
+    cap.textContent = "no feasible placement \u2014 holding position";
+    return;
+  }
+  const anyViol = front.some(f=>f.sla_violations>0);
+  const yKey  = anyViol ? "sla_violations" : "power_w";
+  frontChart.options.scales.y.title.text =
+      anyViol ? "SLA violations" : "power (W)";
+
+  const pt = f => ({x:f.cost_per_hr, y:f[yKey], meta:f});
+  frontChart.data.datasets = [
+    {label:"alternatives", data:front.filter(f=>!f.chosen).map(pt),
+     pointRadius:7, borderColor:"#7b8a9e",
+     backgroundColor:"transparent", borderWidth:2, showLine:false},
+    {label:"chosen", data:front.filter(f=>f.chosen).map(pt),
+     pointRadius:13, backgroundColor:"#4da3ff", borderColor:"#fff",
+     borderWidth:2, showLine:false}
+  ];
+  frontChart.update();
+  cap.textContent = front.length+" non-dominated placements \u00B7 policy: "+policy;
+}
+
+function renderLog(events){
+  const el = document.getElementById("log");
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+  el.innerHTML = (events||[]).map(function(l){
+    const cls = l.indexOf("MIGRATE")===0 ? "mig" : "sub";
+    const safe = l.replace(/[&<>]/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});
+    return '<span class="'+cls+'">'+safe+'</span>';
+  }).join("\n");
+  if(stick) el.scrollTop = el.scrollHeight;
+}
+
+async function tick(){
+  try{
+    const r = await fetch("/api/state");
+    const d = await r.json();
+
+    const dot  = document.getElementById("s-dot");
+    const conn = document.getElementById("s-conn");
+    dot.style.background = d.connected ? "var(--ok)" : "var(--bad)";
+    conn.textContent = d.connected ? "live"
+        : (d.waiting ? "waiting for controller" : "stale "+(d.age_s||"?")+"s");
+
+    if(d.waiting || !Object.keys(d.nodes||{}).length){
+      document.getElementById("edge-col").innerHTML =
+        '<div class="empty">waiting for controller\u2026</div>';
+      document.getElementById("core-col").innerHTML = "";
+      return;
+    }
+
+    const t = d.totals || {};
+    document.getElementById("s-cost").textContent  = "\u20B9"+(t.cost_per_hr||0);
+    document.getElementById("s-pow").textContent   = Math.round(t.power_w||0);
+    document.getElementById("s-viol").textContent  = t.sla_violations||0;
+    document.getElementById("s-viol").style.color  =
+        (t.sla_violations>0) ? "var(--bad)" : "var(--ok)";
+    document.getElementById("s-nodes").textContent =
+        (t.nodes_ready||0)+"/"+(t.nodes_total||0);
+    document.getElementById("s-policy").textContent = d.policy;
+
+    renderNodes(d.nodes, d.workloads);
+    renderLatency(d.history || [], d.workloads);
+    renderFront(d.front, d.policy);
+    renderLog(d.events);
+  }catch(e){
+    document.getElementById("s-dot").style.background = "var(--bad)";
+    document.getElementById("s-conn").textContent = "disconnected";
+  }
+}
+
+initCharts();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
