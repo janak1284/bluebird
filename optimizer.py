@@ -26,6 +26,7 @@ class Node:
     max_w: float
     ready: bool = True
     service_ms: float = 2.0  # mean per-request service time on this node
+    raw_hostname: str = ""
 
 @dataclass
 class Workload:

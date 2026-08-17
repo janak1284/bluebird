@@ -59,6 +59,7 @@ def build_snapshot(nodes: Dict[str, Node],
 
         nodes_out[name] = {
             "tier": n.tier,
+            "raw_hostname": n.raw_hostname,
             "zone": getattr(n, "zone", n.tier),
             "cpu_util": c_util,
             "mem_util": m_util,
@@ -115,12 +116,14 @@ def explain_migration(w_name: str, src: str, dst: str,
                f"breaches SLA {wl_out[breached[0]]['sla_ms']}ms"
                if breached else "proactive rebalance, no active breach")
 
-    d_cost = nodes[dst].cost_per_hr - nodes[src].cost_per_hr
-    d_pow = (snapshot["nodes"][dst]["power_w"]
-             - snapshot["nodes"][src]["power_w"])
+    d_cost = nodes[dst].cost_per_hr - (nodes[src].cost_per_hr if src in nodes else 0.0)
+    dst_pow = snapshot["nodes"][dst]["power_w"] if dst in snapshot["nodes"] else 0.0
+    src_pow = snapshot["nodes"][src]["power_w"] if src in snapshot.get("nodes", {}) else 0.0
+    d_pow = dst_pow - src_pow
+    src_tier = nodes[src].tier if src in nodes else "unknown"
 
     return [
-        f"MIGRATE {w_name}: {src} ({nodes[src].tier}) "
+        f"MIGRATE {w_name}: {src} ({src_tier}) "
         f"-> {dst} ({nodes[dst].tier})",
         f"  trigger  : {trigger}",
         f"  reasoning: {w_name} class={wl_out[w_name]['class']}, "
@@ -134,7 +137,7 @@ def explain_migration(w_name: str, src: str, dst: str,
 def get_snapshot() -> dict:
     try:
         result = subprocess.check_output(
-            ["curl.exe", "-s", "http://10.243.176.184:8080/api/v1/snapshot"],
+            ["curl", "-s", "http://10.243.176.184:8080/api/v1/snapshot"],
             timeout=10
         )
         snapshot = json.loads(result.decode('utf-8'))
@@ -147,7 +150,7 @@ def get_snapshot() -> dict:
             }
         return snapshot
     except Exception as e:
-        print(f"Warning: Could not fetch from API via curl.exe ({e}). Using fallback snapshot.")
+        print(f"Warning: Could not fetch from API via curl ({e}). Using fallback snapshot.")
         return {
             "timestamp": time.time(),
             "nodes": {
@@ -165,7 +168,7 @@ def get_snapshot() -> dict:
 def get_static_nodes() -> dict:
     try:
         result = subprocess.check_output(
-            ["curl.exe", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
+            ["curl", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
             timeout=10
         )
         data = json.loads(result.decode('utf-8'))
@@ -186,7 +189,7 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
         idle_w = static.get("idle_w") or data.get("idle_w") or (12.0 if is_edge else 25.0)
         max_w = static.get("max_w") or data.get("max_w") or (45.0 if is_edge else 65.0)
         
-        n = Node(name, tier, cores, base_lat, cost, idle_w, max_w, data.get("ready", True))
+        n = Node(name=name, raw_hostname=data.get("raw_hostname", ""), tier=tier, cores=cores, base_latency_ms=base_lat, cost_per_hr=cost, idle_w=idle_w, max_w=max_w, ready=data.get("ready", True))
         n.zone = static.get("zone") or data.get("zone") or tier
         nodes[name] = n
     workloads = {
@@ -233,13 +236,14 @@ def run(collect: Optional[Callable[[], tuple]] = None,
                 raw_snapshot = get_snapshot()
                 nodes, workloads = parse_snapshot(raw_snapshot, static_nodes)
 
-            placement, front, objs = optimize(nodes, workloads, policy)
+            active_policy = getattr(state, "CURRENT_POLICY", policy)
+            placement, front, objs = optimize(nodes, workloads, active_policy)
             if not placement:
                 time.sleep(period)
                 continue
 
             snapshot = build_snapshot(nodes, workloads, placement,
-                                      front, objs, policy, raw_snapshot=raw_snapshot)
+                                      front, objs, active_policy, raw_snapshot=raw_snapshot)
 
             # diff against reality to find what needs to move
             events = []

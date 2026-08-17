@@ -18,7 +18,16 @@ LATEST: dict = {}
 HISTORY = deque(maxlen=300)
 
 # Pre-formatted decision log lines, newest last. Rendered verbatim.
-EVENTS = deque(maxlen=50)
+EVENTS = deque(maxlen=100)
+
+CURRENT_POLICY = "sla-first"
+
+
+def set_policy(policy: str) -> bool:
+    global CURRENT_POLICY
+    CURRENT_POLICY = policy
+    EVENTS.append(f"POLICY CHANGE: Requested '{policy}'")
+    return True
 
 
 def publish(snapshot: dict, events: list | None = None) -> None:

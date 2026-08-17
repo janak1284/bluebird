@@ -3,24 +3,21 @@ Dashboard backend for the PS-S04 edge-core orchestrator.
 
 Two ways to run it:
 
-  1. Standalone with synthetic data (build the frontend before the
-     controller exists):
+  1. Standalone with synthetic data & interactive simulator:
          DASHBOARD_FAKE=1 uvicorn dashboard:app --host 0.0.0.0 --port 8080
 
   2. Mounted onto the real controller app:
          from dashboard import router
          app.include_router(router)
      ...and make sure controller/state.py exposes LATEST, HISTORY, EVENTS.
-
-This module is read-only. It never touches the Kubernetes API and never
-influences placement.
 """
 
 import os
 import time
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -109,13 +106,14 @@ def api_state():
 
         payload = {
             "timestamp": ts,
-            "policy": snapshot.get("policy", "sla-first"),
+            "policy": snapshot.get("policy", getattr(state, "CURRENT_POLICY", "sla-first")),
             "nodes": snapshot.get("nodes", {}),
             "workloads": snapshot.get("workloads", {}),
             "front": snapshot.get("front", []),
-            "events": list(state.EVENTS)[-50:],
+            "events": list(state.EVENTS)[-100:],
             "history": _history_window(now),
-            "totals": _totals(snapshot),
+            "totals": snapshot.get("totals") or _totals(snapshot),
+            "simulation": snapshot.get("simulation", {}),
             "connected": (now - ts) < STALE_AFTER_S,
             "age_s": round(now - ts, 2),
             "waiting": False,
@@ -137,6 +135,139 @@ def api_history():
 def api_health():
     ts = (state.LATEST or {}).get("timestamp", 0.0)
     return {"ok": True, "controller_age_s": round(time.time() - ts, 2)}
+
+
+@router.get("/api/policies")
+def api_policies():
+    return JSONResponse({
+        "policies": [
+            {
+                "id": "sla-first",
+                "name": "SLA-First (Reliability)",
+                "description": "Prioritizes zero SLA breaches & minimal tail latency, then optimizes migrations, cost, and power.",
+                "badge": "Highest Reliability",
+                "color": "emerald",
+            },
+            {
+                "id": "cost-first",
+                "name": "Cost-First (Economic)",
+                "description": "Minimizes monetary cloud & compute expenditure per hour while satisfying hard constraints.",
+                "badge": "Lowest Cost",
+                "color": "amber",
+            },
+            {
+                "id": "green",
+                "name": "Green (Energy-Efficient)",
+                "description": "Minimizes cluster power draw (Watts), packing workloads into low-power compute tiers.",
+                "badge": "Eco-Friendly",
+                "color": "teal",
+            },
+        ],
+        "current": getattr(state, "CURRENT_POLICY", "sla-first"),
+    })
+
+
+@router.post("/api/policy")
+async def api_set_policy(request: Request):
+    """Switch active optimization policy."""
+    try:
+        body = await request.json()
+        policy = body.get("policy")
+        if not policy:
+            return JSONResponse({"ok": False, "error": "Missing policy parameter"}, status_code=400)
+
+        if hasattr(state, "set_policy"):
+            success = state.set_policy(policy)
+            if success:
+                return JSONResponse({"ok": True, "policy": policy, "message": f"Policy updated to {policy}"})
+        
+        # Fallback attribute set
+        state.CURRENT_POLICY = policy
+        return JSONResponse({"ok": True, "policy": policy, "message": f"Policy set to {policy}"})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/simulate/spike")
+async def api_simulate_spike(request: Request):
+    """Inject traffic spike on a workload."""
+    try:
+        body = await request.json()
+        workload = body.get("workload", "checkout")
+        rps = float(body.get("rps", 750))
+        
+        if hasattr(state, "set_traffic_spike"):
+            state.set_traffic_spike(workload, rps)
+            return JSONResponse({"ok": True, "workload": workload, "rps": rps, "message": f"Spike injected on {workload}: {rps} rps"})
+        
+        return JSONResponse({"ok": False, "error": "Traffic injection not supported in current mode"}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/simulate/node")
+async def api_simulate_node(request: Request):
+    """Toggle node ready/down state."""
+    try:
+        body = await request.json()
+        node_name = body.get("node")
+        ready = body.get("ready")  # None = toggle, True/False = explicit
+        
+        if hasattr(state, "toggle_node"):
+            new_state = state.toggle_node(node_name, ready)
+            return JSONResponse({"ok": True, "node": node_name, "ready": new_state})
+        
+        return JSONResponse({"ok": False, "error": "Node chaos not supported in current mode"}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/simulate/reset")
+async def api_simulate_reset():
+    """Reset simulation overrides back to automatic cycle."""
+    try:
+        if hasattr(state, "reset_simulation"):
+            state.reset_simulation()
+            return JSONResponse({"ok": True, "message": "Simulation reset to nominal automatic cycle"})
+        return JSONResponse({"ok": True, "message": "Reset not applicable"})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/workload/config")
+async def api_workload_config(request: Request):
+    """Adjust workload SLA threshold or RPS demand."""
+    try:
+        body = await request.json()
+        workload = body.get("workload")
+        sla_ms = body.get("sla_ms")
+        rps = body.get("rps")
+        
+        if hasattr(state, "set_workload_config"):
+            state.set_workload_config(workload, sla_ms=sla_ms, rps=rps)
+            return JSONResponse({"ok": True, "workload": workload, "sla_ms": sla_ms, "rps": rps})
+        
+        return JSONResponse({"ok": False, "error": "Workload tuning not supported in current mode"}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/placement/apply")
+async def api_placement_apply(request: Request):
+    """Manually apply a Pareto candidate or custom placement."""
+    try:
+        body = await request.json()
+        placement = body.get("placement")
+        if not placement:
+            return JSONResponse({"ok": False, "error": "Missing placement"}, status_code=400)
+        
+        if hasattr(state, "apply_manual_placement"):
+            state.apply_manual_placement(placement)
+            return JSONResponse({"ok": True, "placement": placement, "message": "Custom placement applied"})
+        
+        return JSONResponse({"ok": False, "error": "Manual placement not supported in current mode"}, status_code=400)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @router.get("/")
