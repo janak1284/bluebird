@@ -21,11 +21,39 @@ NODE_PROFILES = {
 PROMETHEUS_URL = "http://localhost:9090/api/v1/query"
 
 _last_cpu_sample = {"idle": 0.0, "total": 0.0}
+_pf_process = None
 
 # Global In-Memory Pre-Rendered Cache
 _cached_snapshot_bytes = b"{}"
 _cached_all_nodes_bytes = b"{}"
 _cached_pods_bytes = b"{}"
+
+def get_kube_env():
+    env = os.environ.copy()
+    if 'KUBECONFIG' not in env and os.path.exists(os.path.expanduser('~/.kube/config')):
+        env['KUBECONFIG'] = os.path.expanduser('~/.kube/config')
+    return env
+
+def ensure_prometheus_connection():
+    """Self-healing manager: automatically starts & maintains Prometheus port-forward on 9090."""
+    global _pf_process
+    try:
+        req = urllib.request.Request(f"{PROMETHEUS_URL}?{urllib.parse.urlencode({'query': 'up'})}")
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            if resp.status == 200:
+                return True
+    except Exception:
+        pass
+
+    # Port 9090 down or unresponsive: auto-spawn background port-forward
+    if _pf_process is None or _pf_process.poll() is not None:
+        try:
+            cmd = ["kubectl", "port-forward", "-n", "monitoring", "svc/prometheus-operated", "9090:9090"]
+            _pf_process = subprocess.Popen(cmd, env=get_kube_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1.0)
+        except Exception:
+            pass
+    return False
 
 def get_local_proc_stat_cpu_util():
     """Reads real-time CPU utilization for local host directly from /proc/stat (exact Conky math)."""
@@ -72,12 +100,6 @@ def get_real_sysfs_power_w():
     except Exception:
         pass
     return None
-
-def get_kube_env():
-    env = os.environ.copy()
-    if 'KUBECONFIG' not in env and os.path.exists(os.path.expanduser('~/.kube/config')):
-        env['KUBECONFIG'] = os.path.expanduser('~/.kube/config')
-    return env
 
 def fetch_k3s_node_info():
     nodes = {}
@@ -167,10 +189,11 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
     return pods
 
 def query_promql(query):
+    ensure_prometheus_connection()
     try:
         url = f"{PROMETHEUS_URL}?{urllib.parse.urlencode({'query': query})}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=2) as resp:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             out = {}
             for r in data.get('data', {}).get('result', []):
@@ -211,7 +234,7 @@ def get_base_node_profiles():
     }
 
 def background_telemetry_collector():
-    """Asynchronous background worker: Capped CPU/RAM (0.01-1.00) & Uncapped Power."""
+    """Asynchronous background worker with self-healing Prometheus port-forward connection."""
     global _cached_snapshot_bytes, _cached_all_nodes_bytes, _cached_pods_bytes
     
     base_data = get_base_node_profiles()
@@ -246,7 +269,6 @@ def background_telemetry_collector():
                 
                 raw_cpu = cpus.get(node_ip, cpus.get(node_name, cpus.get(display_name, None)))
                 if raw_cpu is not None:
-                    # Safely capped between 0.01 and 1.00 (prevents >100% rounding glitches)
                     cpu_u = min(max(raw_cpu / 100.0, 0.01), 1.0)
                 elif node_name == "willson" and local_proc_cpu is not None:
                     cpu_u = min(max(local_proc_cpu, 0.01), 1.0)
@@ -259,12 +281,10 @@ def background_telemetry_collector():
                 total_b = mems_total.get(node_ip, mems_total.get(node_name, profile["total_mem_gb"] * 1073741824))
                 
                 if total_b > 0 and avail_b > 0:
-                    # Safely capped between 0.01 and 1.00
                     mem_u = min(max(1.0 - (avail_b / total_b), 0.01), 1.0)
                 else:
                     mem_u = 0.56 if node_name == "willson" else 0.35
                     
-                # 100% Uncapped physical and scaled power draw for all machines
                 if node_name == "willson" and real_sys_power is not None:
                     power_w = real_sys_power
                 else:
@@ -334,7 +354,7 @@ def run_server(port=8080):
     t.start()
     
     server = HTTPServer(('0.0.0.0', port), TelemetryAPIHandler)
-    print(f"🚀 Telemetry REST API Server listening at http://0.0.0.0:{port}/api/v1/snapshot (Safe Demo Mode)")
+    print(f"🚀 Telemetry REST API Server listening at http://0.0.0.0:{port}/api/v1/snapshot (Self-Healing Mode)")
     server.serve_forever()
 
 if __name__ == "__main__":
