@@ -1,16 +1,16 @@
 # Workloads Manifest for PS4 Cluster
-# Deploys 1 pod onto each node with different priority/importance classes
+# Deploys pods onto each node with specific workload classes
 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: checkout-critical-01
+  name: user-profile-std-01
   namespace: default
   labels:
-    app: checkout
-    workload-class: latency-critical
+    app: user-profile
+    workload-class: standard
 spec:
-  nodeName: archlinux  # Edge Node 1
+  nodeName: fedora  # Edge Node (low latency, high cost)
   containers:
   - name: app
     image: nginx:alpine
@@ -22,13 +22,13 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: user-profile-std-01
+  name: checkout-critical-01
   namespace: default
   labels:
-    app: user-profile
-    workload-class: standard
+    app: checkout
+    workload-class: latency-critical
 spec:
-  nodeName: fedora  # Edge Node 2
+  nodeName: fedora  # Edge Node
   containers:
   - name: app
     image: nginx:alpine
@@ -59,6 +59,24 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: analytics-batch-02
+  namespace: default
+  labels:
+    app: analytics
+    workload-class: batch-analytics
+spec:
+  nodeName: archlinux  # Core Node 1
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: analytics-batch-03
   namespace: default
   labels:
     app: analytics

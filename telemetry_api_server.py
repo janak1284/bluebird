@@ -12,14 +12,18 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
     "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
-    "archlinux":    {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
-    "fedora":       {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
-    "desktop-prnd0ve": {"alias": "edge-node-03", "tier": "core", "zone": "core-2", "base_latency_ms": 38, "cost_per_hr": 2.2, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
+    "archlinux":    {"alias": "core-node-01", "tier": "core", "zone": "core-2", "base_latency_ms": 42, "cost_per_hr": 2.1, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
+    "fedora":       {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
+    "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
 }
 
 PROMETHEUS_URL = "http://localhost:9090/api/v1/query"
 
 _last_cpu_sample = {"idle": 0.0, "total": 0.0}
+_cache = {
+    "nodes_ts": 0, "nodes_data": {},
+    "pods_ts": 0, "pods_data": {}
+}
 
 def get_local_proc_stat_cpu_util():
     """Reads real-time CPU utilization for local host directly from /proc/stat (exact Conky math)."""
@@ -74,11 +78,15 @@ def get_kube_env():
     return env
 
 def get_live_k3s_node_info():
-    """Queries K3s via kubectl to get live node readiness and internal IP mapping."""
+    """Queries K3s via kubectl (with 2s TTL cache for fast HTTP performance)."""
+    now = time.time()
+    if now - _cache["nodes_ts"] < 2.0 and _cache["nodes_data"]:
+        return _cache["nodes_data"]
+        
     nodes = {}
     try:
         cmd = ["kubectl", "get", "nodes", "-o", "json"]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3, env=get_kube_env())
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=2, env=get_kube_env())
         if res.returncode == 0:
             data = json.loads(res.stdout)
             for item in data.get('items', []):
@@ -96,16 +104,63 @@ def get_live_k3s_node_info():
                         break
                         
                 nodes[name] = {"ready": is_ready, "ip": internal_ip}
+            _cache["nodes_data"] = nodes
+            _cache["nodes_ts"] = now
     except Exception:
         pass
-    return nodes
+    return _cache["nodes_data"] if _cache["nodes_data"] else nodes
 
-def get_live_k3s_pods():
-    """Queries K3s for live workload pods."""
+def query_promql(query):
+    try:
+        url = f"{PROMETHEUS_URL}?{urllib.parse.urlencode({'query': query})}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            out = {}
+            for r in data.get('data', {}).get('result', []):
+                metric = r['metric']
+                val = float(r['value'][1])
+                
+                instance = metric.get('instance', '')
+                node = metric.get('node', '') or metric.get('nodename', '')
+                ip = instance.split(':')[0] if instance else ''
+                
+                if node:
+                    out[node] = val
+                if ip:
+                    out[ip] = val
+            return out
+    except Exception:
+        return {}
+
+def get_live_k3s_pods(node_cpu_map, live_nodes_info):
+    """Queries K3s for live workload pods and cross-checks node readiness status."""
+    now = time.time()
+    if now - _cache["pods_ts"] < 2.0 and _cache["pods_data"]:
+        pods = _cache["pods_data"]
+        for p_name, p_info in pods.items():
+            disp_node = p_info.get("node")
+            raw_node = p_info.get("raw_node")
+            is_node_ready = live_nodes_info.get(raw_node, {}).get("ready", False)
+            
+            if not is_node_ready:
+                p_info["status"] = "NodeOffline"
+                p_info["p99_ms"] = 0.0
+                p_info["rps"] = 0
+            else:
+                profile = NODE_PROFILES.get(raw_node, {"base_latency_ms": 10})
+                base_lat = profile.get("base_latency_ms", 10)
+                cpu_u = node_cpu_map.get(disp_node, 0.05)
+                rps = p_info.get("rps", 250)
+                
+                queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - min(cpu_u, 0.95), 0.05))
+                p_info["p99_ms"] = round(base_lat + queuing_delay, 1)
+        return pods
+
     pods = {}
     try:
         cmd = ["kubectl", "get", "pods", "-n", "default", "-o", "json"]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=3, env=get_kube_env())
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=2, env=get_kube_env())
         if res.returncode == 0:
             data = json.loads(res.stdout)
             for item in data.get('items', []):
@@ -113,7 +168,11 @@ def get_live_k3s_pods():
                 node_name = item['spec'].get('nodeName', 'unassigned')
                 phase = item['status'].get('phase', 'Unknown')
                 
-                display_node = NODE_PROFILES.get(node_name, {}).get("alias", node_name)
+                is_node_ready = live_nodes_info.get(node_name, {}).get("ready", False)
+                
+                profile = NODE_PROFILES.get(node_name, {"alias": node_name, "base_latency_ms": 10})
+                display_node = profile.get("alias", node_name)
+                base_lat = profile.get("base_latency_ms", 10)
                 
                 labels = item['metadata'].get('labels', {})
                 app_class = labels.get('workload-class')
@@ -132,43 +191,33 @@ def get_live_k3s_pods():
                 }
                 sla_ms = sla_map.get(app_class, 100)
                 
+                if not is_node_ready:
+                    effective_status = "NodeOffline"
+                    p99_ms = 0.0
+                    rps = 0
+                else:
+                    effective_status = phase
+                    cpu_u = node_cpu_map.get(display_node, 0.05)
+                    rps = 250 if phase == "Running" else 0
+                    queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - min(cpu_u, 0.95), 0.05))
+                    p99_ms = round(base_lat + queuing_delay, 1) if phase == "Running" else 0.0
+                
                 pods[pod_name] = {
                     "pod_name": pod_name,
                     "node": display_node,
                     "raw_node": node_name,
-                    "status": phase,
+                    "status": effective_status,
                     "class": app_class,
                     "sla_ms": sla_ms,
-                    "p99_ms": 14.2 if phase == "Running" else 0.0,
-                    "rps": 250 if phase == "Running" else 0,
+                    "p99_ms": p99_ms,
+                    "rps": rps,
                     "last_moved": int(time.time()) - 120
                 }
+            _cache["pods_data"] = pods
+            _cache["pods_ts"] = now
     except Exception:
         pass
-    return pods
-
-def query_promql(query):
-    try:
-        url = f"{PROMETHEUS_URL}?{urllib.parse.urlencode({'query': query})}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
-            out = {}
-            for r in data.get('data', {}).get('result', []):
-                metric = r['metric']
-                val = float(r['value'][1])
-                
-                instance = metric.get('instance', '')
-                node = metric.get('node', '') or metric.get('nodename', '')
-                ip = instance.split(':')[0] if instance else ''
-                
-                if node:
-                    out[node] = val
-                if ip:
-                    out[ip] = val
-            return out
-    except Exception:
-        return {}
+    return _cache["pods_data"] if _cache["pods_data"] else pods
 
 def get_base_node_profiles():
     """Returns ONLY the static base data for all 4 nodes."""
@@ -195,7 +244,6 @@ def get_base_node_profiles():
 def generate_telemetry_snapshot():
     """Generates real-time live telemetry snapshot."""
     live_nodes_info = get_live_k3s_node_info()
-    live_pods = get_live_k3s_pods()
     
     cpu_query = '100 - (avg by (instance, node) (rate(node_cpu_seconds_total{mode="idle"}[6s])) * 100)'
     mem_avail_query = 'node_memory_MemAvailable_bytes'
@@ -209,6 +257,7 @@ def generate_telemetry_snapshot():
     local_proc_cpu = get_local_proc_stat_cpu_util()
     
     nodes_data = {}
+    node_cpu_map = {}
     for node_name, profile in NODE_PROFILES.items():
         n_info = live_nodes_info.get(node_name, {})
         is_ready = n_info.get("ready", False)
@@ -219,15 +268,15 @@ def generate_telemetry_snapshot():
             
         display_name = profile["alias"]
         
-        # Priority 1: Prometheus metric
         raw_cpu = cpus.get(node_ip, cpus.get(node_name, cpus.get(display_name, None)))
         if raw_cpu is not None:
             cpu_u = min(max(raw_cpu / 100.0, 0.0), 1.0)
         elif node_name == "willson" and local_proc_cpu is not None:
-            # Priority 2: Direct /proc/stat reader for local master host
             cpu_u = local_proc_cpu
         else:
             cpu_u = 0.05
+        
+        node_cpu_map[display_name] = cpu_u
         
         avail_b = mems_avail.get(node_ip, mems_avail.get(node_name, 0))
         total_b = mems_total.get(node_ip, mems_total.get(node_name, profile["total_mem_gb"] * 1073741824))
@@ -252,6 +301,8 @@ def generate_telemetry_snapshot():
             "power_w": power_w
         }
         
+    live_pods = get_live_k3s_pods(node_cpu_map, live_nodes_info)
+    
     return {
         "timestamp": int(time.time()),
         "total_active_nodes": len(nodes_data),
@@ -268,7 +319,9 @@ class TelemetryAPIHandler(BaseHTTPRequestHandler):
             base_data = get_base_node_profiles()
             self._send_json(base_data)
         elif self.path in ["/pods", "/api/v1/pods"]:
-            pods = get_live_k3s_pods()
+            live_nodes_info = get_live_k3s_node_info()
+            node_cpu_map = {}
+            pods = get_live_k3s_pods(node_cpu_map, live_nodes_info)
             self._send_json({"pods": pods})
         else:
             self.send_response(404)
@@ -276,11 +329,21 @@ class TelemetryAPIHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Endpoint not found. Use /api/v1/snapshot or /api/v1/all-nodes")
             
     def _send_json(self, data):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, indent=2).encode('utf-8'))
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps(data, indent=2).encode('utf-8'))
+        except (ConnectionResetError, BrokenPipeError):
+            pass  # Suppress clean socket disconnections
+
+    def log_message(self, format, *args):
+        # Print HTTP GET request logs to terminal console
+        sys.stderr.write("%s - - [%s] %s\n" %
+                         (self.address_string(),
+                          self.log_date_time_string(),
+                          format % args))
 
 def run_server(port=8080):
     server = HTTPServer(('0.0.0.0', port), TelemetryAPIHandler)
