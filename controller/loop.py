@@ -34,7 +34,8 @@ def build_snapshot(nodes: Dict[str, Node],
                    placement: Dict[str, str],
                    front: list,
                    chosen_objs,
-                   policy: str) -> dict:
+                   policy: str,
+                   raw_snapshot: Optional[dict] = None) -> dict:
     """
     Turn optimizer-native objects into the frozen /api/state contract.
 
@@ -46,14 +47,24 @@ def build_snapshot(nodes: Dict[str, Node],
 
     nodes_out = {}
     for name, n in nodes.items():
+        c_util = round(util[name], 3)
+        m_util = round(min(0.2 + util[name] * 0.5, 0.95), 3)
+        p_w = round(node_power(n, util[name]), 1)
+
+        if raw_snapshot and "nodes" in raw_snapshot and name in raw_snapshot["nodes"]:
+            raw_n = raw_snapshot["nodes"][name]
+            if "cpu_util" in raw_n: c_util = raw_n["cpu_util"]
+            if "mem_util" in raw_n: m_util = raw_n["mem_util"]
+            if "power_w" in raw_n: p_w = raw_n["power_w"]
+
         nodes_out[name] = {
             "tier": n.tier,
             "zone": getattr(n, "zone", n.tier),
-            "cpu_util": round(util[name], 3),
-            "mem_util": round(min(0.2 + util[name] * 0.5, 0.95), 3),
+            "cpu_util": c_util,
+            "mem_util": m_util,
             "ready": n.ready,
             "base_latency_ms": n.base_latency_ms,
-            "power_w": round(node_power(n, util[name]), 1),
+            "power_w": p_w,
             "cost_per_hr": n.cost_per_hr,
             "cpu_cores": n.cores,
         }
@@ -151,11 +162,40 @@ def get_snapshot() -> dict:
             }
         }
 
+_cached_static_nodes = None
+
+def get_static_nodes() -> dict:
+    global _cached_static_nodes
+    if _cached_static_nodes is not None:
+        return _cached_static_nodes
+    try:
+        result = subprocess.check_output(
+            ["curl.exe", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
+            timeout=10
+        )
+        data = json.loads(result.decode('utf-8'))
+        _cached_static_nodes = data.get("nodes", {})
+        return _cached_static_nodes
+    except Exception as e:
+        print(f"Warning: Could not fetch static nodes from /all-nodes ({e}).")
+        return {}
+
 def parse_snapshot(snapshot: dict) -> Tuple[Dict[str, Node], Dict[str, Workload]]:
-    nodes = {
-        name: Node(name, data.get("tier", "core"), data.get("cpu_cores", 4), data.get("base_latency_ms", 40.0), data.get("cost_per_hr", 2.0), data.get("idle_w", 20.0), data.get("max_w", 60.0), data.get("ready", True))
-        for name, data in snapshot.get("nodes", {}).items()
-    }
+    static_nodes = get_static_nodes()
+    nodes = {}
+    for name, data in snapshot.get("nodes", {}).items():
+        static = static_nodes.get(name, {})
+        is_edge = "edge" in name.lower()
+        tier = static.get("tier") or data.get("tier") or ("edge" if is_edge else "core")
+        cores = static.get("cpu_cores") or data.get("cpu_cores") or (4.0 if is_edge else 8.0)
+        base_lat = static.get("base_latency_ms") or data.get("base_latency_ms") or (4.0 if is_edge else 40.0)
+        cost = static.get("cost_per_hr") or data.get("cost_per_hr") or (9.0 if is_edge else 2.0)
+        idle_w = static.get("idle_w") or data.get("idle_w") or (12.0 if is_edge else 25.0)
+        max_w = static.get("max_w") or data.get("max_w") or (45.0 if is_edge else 65.0)
+        
+        n = Node(name, tier, cores, base_lat, cost, idle_w, max_w, data.get("ready", True))
+        n.zone = static.get("zone") or data.get("zone") or tier
+        nodes[name] = n
     workloads = {
         name: Workload(
             name,
@@ -189,10 +229,12 @@ def run(collect: Optional[Callable[[], tuple]] = None,
     """
     while not (stop and stop()):
         try:
+            raw_snapshot = None
             if collect:
                 nodes, workloads = collect()
             else:
-                nodes, workloads = parse_snapshot(get_snapshot())
+                raw_snapshot = get_snapshot()
+                nodes, workloads = parse_snapshot(raw_snapshot)
 
             placement, front, objs = optimize(nodes, workloads, policy)
             if not placement:
@@ -200,7 +242,7 @@ def run(collect: Optional[Callable[[], tuple]] = None,
                 continue
 
             snapshot = build_snapshot(nodes, workloads, placement,
-                                      front, objs, policy)
+                                      front, objs, policy, raw_snapshot=raw_snapshot)
 
             # diff against reality to find what needs to move
             events = []
