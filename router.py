@@ -1,5 +1,5 @@
 # router.py
-# Custom High-Speed Dynamic Proxy Router for Edge-Core Cloud Orchestration
+# Custom High-Speed Resilient Proxy Router for Edge-Core Cloud Orchestration
 
 import sys
 import time
@@ -10,7 +10,6 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
 # In-Memory Dynamic Routing Table
-# Key: URL Prefix Route, Value: Target Pod IP:Port or NodePort
 ROUTE_TABLE = {
     "/checkout":     {"service": "checkout-critical-01", "node": "willson", "target": "http://127.0.0.1:30081"},
     "/user-profile": {"service": "user-profile-std-01",  "node": "willson", "target": "http://127.0.0.1:30082"},
@@ -48,34 +47,41 @@ class DynamicRouterHandler(BaseHTTPRequestHandler):
             return
 
         target_info = ROUTE_TABLE[matched_prefix]
-        target_url_base = target_info["target"].rstrip('/')
+        primary_target_url = target_info["target"].rstrip('/')
+        
+        # Fallback target using local 127.0.0.1 (K3s Kube-Proxy internal overlay route)
+        port_num = primary_target_url.split(':')[-1]
+        fallback_target_url = f"http://127.0.0.1:{port_num}"
 
-        # 3. Perform Ultra-Fast Reverse Proxy to Target Pod Endpoint
-        try:
-            req = urllib.request.Request(target_url_base, headers={
-                'User-Agent': 'Antigravity-Dynamic-Router/1.0'
-            })
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
-                content = resp.read()
-                self.send_response(resp.status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("X-Proxy-Routed-By", "Antigravity-Router")
-                self.send_header("X-Proxy-Target-Node", target_info["node"])
-                self.end_headers()
-                self.wfile.write(content)
-        except Exception as e:
-            self._send_json(502, {
-                "error": "Bad Gateway - Target Pod Unreachable",
-                "route": matched_prefix,
-                "target_node": target_info["node"],
-                "target_url": target_url_base,
-                "details": str(e)
-            })
+        # 3. Perform Ultra-Fast Reverse Proxy with Resilient Local Fallback
+        for target_url in [primary_target_url, fallback_target_url]:
+            try:
+                req = urllib.request.Request(target_url, headers={
+                    'User-Agent': 'Antigravity-Dynamic-Router/1.0'
+                })
+                with urllib.request.urlopen(req, timeout=0.8) as resp:
+                    content = resp.read()
+                    self.send_response(resp.status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("X-Proxy-Routed-By", "Antigravity-Router")
+                    self.send_header("X-Proxy-Target-Node", target_info["node"])
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+            except Exception:
+                continue
+
+        # If both primary IP and fallback timed out
+        self._send_json(502, {
+            "error": "Bad Gateway - Target Pod Unreachable",
+            "route": matched_prefix,
+            "target_node": target_info["node"],
+            "target_url": primary_target_url
+        })
 
     def do_POST(self):
         # API Endpoint for Scheduler: Update Routing Table on Pod Migration
-        # POST /api/v1/router/update  Body: {"route": "/checkout", "new_node": "archlinux", "new_target": "http://10.243.176.3:30081"}
         if self.path in ["/update", "/api/v1/router/update"]:
             try:
                 content_len = int(self.headers.get('Content-Length', 0))
@@ -128,7 +134,7 @@ class DynamicRouterHandler(BaseHTTPRequestHandler):
 
 def run_router(port=8000):
     server = ThreadedHTTPServer(('0.0.0.0', port), DynamicRouterHandler)
-    print(f"🚀 Custom Dynamic Router listening at http://0.0.0.0:{port}/")
+    print(f"🚀 Custom Resilient Dynamic Router listening at http://0.0.0.0:{port}/")
     print(f"   - /checkout      ➔ {ROUTE_TABLE['/checkout']['target']}")
     print(f"   - /user-profile  ➔ {ROUTE_TABLE['/user-profile']['target']}")
     print(f"   - /analytics     ➔ {ROUTE_TABLE['/analytics']['target']}")
