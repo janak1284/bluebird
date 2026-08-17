@@ -46,7 +46,7 @@ def get_local_proc_stat_cpu_util():
             
             if dt_total > 0 and _last_cpu_sample["total"] > 0:
                 util = 1.0 - (dt_idle / dt_total)
-                return min(max(util, 0.0), 1.0)
+                return min(max(util, 0.01), 1.0)
     except Exception:
         pass
     return None
@@ -146,9 +146,9 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     rps = 0
                 else:
                     effective_status = phase
-                    cpu_u = node_cpu_map.get(display_node, 0.05)
+                    cpu_u = node_cpu_map.get(display_node, 0.01)
                     rps = 250 if phase == "Running" else 0
-                    queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - min(cpu_u, 0.95), 0.05))
+                    queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - cpu_u, 0.05))
                     p99_ms = round(base_lat + queuing_delay, 1) if phase == "Running" else 0.0
                 
                 pods[pod_name] = {
@@ -211,7 +211,7 @@ def get_base_node_profiles():
     }
 
 def background_telemetry_collector():
-    """Asynchronous background worker continuously refreshing telemetry cache."""
+    """Asynchronous background worker: Capped CPU/RAM (0.01-1.00) & Uncapped Power."""
     global _cached_snapshot_bytes, _cached_all_nodes_bytes, _cached_pods_bytes
     
     base_data = get_base_node_profiles()
@@ -246,11 +246,12 @@ def background_telemetry_collector():
                 
                 raw_cpu = cpus.get(node_ip, cpus.get(node_name, cpus.get(display_name, None)))
                 if raw_cpu is not None:
-                    cpu_u = min(max(raw_cpu / 100.0, 0.0), 1.0)
+                    # Safely capped between 0.01 and 1.00 (prevents >100% rounding glitches)
+                    cpu_u = min(max(raw_cpu / 100.0, 0.01), 1.0)
                 elif node_name == "willson" and local_proc_cpu is not None:
-                    cpu_u = local_proc_cpu
+                    cpu_u = min(max(local_proc_cpu, 0.01), 1.0)
                 else:
-                    cpu_u = 0.05
+                    cpu_u = 0.01
                 
                 node_cpu_map[display_name] = cpu_u
                 
@@ -258,10 +259,12 @@ def background_telemetry_collector():
                 total_b = mems_total.get(node_ip, mems_total.get(node_name, profile["total_mem_gb"] * 1073741824))
                 
                 if total_b > 0 and avail_b > 0:
-                    mem_u = min(max(1.0 - (avail_b / total_b), 0.0), 1.0)
+                    # Safely capped between 0.01 and 1.00
+                    mem_u = min(max(1.0 - (avail_b / total_b), 0.01), 1.0)
                 else:
                     mem_u = 0.56 if node_name == "willson" else 0.35
                     
+                # 100% Uncapped physical and scaled power draw for all machines
                 if node_name == "willson" and real_sys_power is not None:
                     power_w = real_sys_power
                 else:
@@ -306,6 +309,9 @@ class TelemetryAPIHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Endpoint not found. Use /api/v1/snapshot or /api/v1/all-nodes")
             
+    def _send_json(self, data):
+        self._send_bytes(json.dumps(data, indent=2).encode('utf-8'))
+
     def _send_bytes(self, payload_bytes):
         try:
             self.send_response(200)
@@ -328,7 +334,7 @@ def run_server(port=8080):
     t.start()
     
     server = HTTPServer(('0.0.0.0', port), TelemetryAPIHandler)
-    print(f"🚀 Telemetry REST API Server listening at http://0.0.0.0:{port}/api/v1/snapshot (Ultra-fast <1ms async mode)")
+    print(f"🚀 Telemetry REST API Server listening at http://0.0.0.0:{port}/api/v1/snapshot (Safe Demo Mode)")
     server.serve_forever()
 
 if __name__ == "__main__":
