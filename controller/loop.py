@@ -162,26 +162,19 @@ def get_snapshot() -> dict:
             }
         }
 
-_cached_static_nodes = None
-
 def get_static_nodes() -> dict:
-    global _cached_static_nodes
-    if _cached_static_nodes is not None:
-        return _cached_static_nodes
     try:
         result = subprocess.check_output(
             ["curl.exe", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
             timeout=10
         )
         data = json.loads(result.decode('utf-8'))
-        _cached_static_nodes = data.get("nodes", {})
-        return _cached_static_nodes
+        return data.get("nodes", {})
     except Exception as e:
         print(f"Warning: Could not fetch static nodes from /all-nodes ({e}).")
         return {}
 
-def parse_snapshot(snapshot: dict) -> Tuple[Dict[str, Node], Dict[str, Workload]]:
-    static_nodes = get_static_nodes()
+def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node], Dict[str, Workload]]:
     nodes = {}
     for name, data in snapshot.get("nodes", {}).items():
         static = static_nodes.get(name, {})
@@ -227,6 +220,10 @@ def run(collect: Optional[Callable[[], tuple]] = None,
         Supplied by the executor (make-before-break). Pass None to run the
         loop in observe-only mode -- useful before the executor exists.
     """
+    static_nodes = {}
+    if not collect:
+        static_nodes = get_static_nodes()
+
     while not (stop and stop()):
         try:
             raw_snapshot = None
@@ -234,7 +231,7 @@ def run(collect: Optional[Callable[[], tuple]] = None,
                 nodes, workloads = collect()
             else:
                 raw_snapshot = get_snapshot()
-                nodes, workloads = parse_snapshot(raw_snapshot)
+                nodes, workloads = parse_snapshot(raw_snapshot, static_nodes)
 
             placement, front, objs = optimize(nodes, workloads, policy)
             if not placement:
