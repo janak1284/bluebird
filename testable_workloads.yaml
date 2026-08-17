@@ -1,5 +1,5 @@
 # testable_workloads.yaml
-# Distributed Multi-Node Microservices (Testing Remote Worker Node Access)
+# Production Microservices with Clean JSON Output
 
 apiVersion: apps/v1
 kind: Deployment
@@ -20,7 +20,7 @@ spec:
         app: checkout-app
         workload-class: latency-critical
     spec:
-      nodeName: fedora  # Pinned to Fedora (Edge Node 1)
+      nodeName: willson  # Core Master Node
       containers:
       - name: checkout-api
         image: python:3.11-slim
@@ -41,7 +41,7 @@ spec:
                       "service": "checkout-critical-01",
                       "sla_ms": 20,
                       "class": "latency-critical",
-                      "served_by_node": os.environ.get("MY_NODE", "fedora"),
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
                       "timestamp": int(time.time())
                   }
                   self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
@@ -74,7 +74,7 @@ spec:
         app: user-profile-app
         workload-class: standard
     spec:
-      nodeName: desktop-prnd0ve  # Pinned to WSL (Edge Node 2)
+      nodeName: willson  # Core Master Node
       containers:
       - name: user-profile-api
         image: python:3.11-slim
@@ -95,7 +95,7 @@ spec:
                       "service": "user-profile-std-01",
                       "sla_ms": 100,
                       "class": "standard",
-                      "served_by_node": os.environ.get("MY_NODE", "desktop-prnd0ve"),
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
                       "timestamp": int(time.time())
                   }
                   self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
@@ -128,7 +128,7 @@ spec:
         app: analytics-app
         workload-class: batch-analytics
     spec:
-      nodeName: archlinux  # Pinned to Arch Linux (Core Node 1)
+      nodeName: willson  # Core Master Node
       containers:
       - name: analytics-api
         image: python:3.11-slim
@@ -149,7 +149,7 @@ spec:
                       "service": "analytics-batch-01",
                       "sla_ms": 500,
                       "class": "batch-analytics",
-                      "served_by_node": os.environ.get("MY_NODE", "archlinux"),
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
                       "timestamp": int(time.time())
                   }
                   self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
@@ -163,7 +163,7 @@ spec:
         ports:
         - containerPort: 8080
 ---
-# Direct Raw IP NodePort Services (Ports 30081, 30082, 30083)
+# Dual-Mode Kubernetes NodePort Services
 apiVersion: v1
 kind: Service
 metadata:
