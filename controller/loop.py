@@ -1,0 +1,235 @@
+"""
+The control loop. This is the seam that links every component:
+
+    telemetry  ->  optimizer.optimize()  ->  executor (migrate)
+                                         ->  state.publish()  ->  dashboard
+
+Run it alongside the dashboard in one process:
+
+    uvicorn controller.app:app --host 0.0.0.0 --port 8080
+
+The optimizer knows nothing about Kubernetes.
+The dashboard knows nothing about the optimizer.
+This module is the only thing that knows about both.
+"""
+
+import time
+import json
+import subprocess
+import traceback
+from typing import Callable, Dict, Optional, Tuple
+
+from optimizer import (Node, Workload, optimize, evaluate, node_load,
+                       predicted_p99, node_power)
+from controller import state
+
+CONTROL_PERIOD_S = 2.0
+POLICY = "sla-first"
+
+
+# ------------------------------------------------------ snapshot conversion
+
+def build_snapshot(nodes: Dict[str, Node],
+                   workloads: Dict[str, Workload],
+                   placement: Dict[str, str],
+                   front: list,
+                   chosen_objs,
+                   policy: str) -> dict:
+    """
+    Turn optimizer-native objects into the frozen /api/state contract.
+
+    This function is the translation layer. If the dashboard contract ever
+    changes, it changes here and nowhere else.
+    """
+    load = node_load(placement, nodes, workloads)
+    util = {n: min(load[n] / nodes[n].cores, 1.0) for n in nodes}
+
+    nodes_out = {}
+    for name, n in nodes.items():
+        nodes_out[name] = {
+            "tier": n.tier,
+            "zone": getattr(n, "zone", n.tier),
+            "cpu_util": round(util[name], 3),
+            "mem_util": round(min(0.2 + util[name] * 0.5, 0.95), 3),
+            "ready": n.ready,
+            "base_latency_ms": n.base_latency_ms,
+            "power_w": round(node_power(n, util[name]), 1),
+            "cost_per_hr": n.cost_per_hr,
+            "cpu_cores": n.cores,
+        }
+
+    workloads_out = {}
+    for w_name, n_name in placement.items():
+        w = workloads[w_name]
+        workloads_out[w_name] = {
+            "node": n_name,
+            "p99_ms": round(predicted_p99(w, nodes[n_name], util[n_name]), 1),
+            "rps": round(w.rps),
+            "sla_ms": w.sla_ms,
+            "class": "latency-critical" if w.allowed_tiers == ("edge",)
+                     else ("batch" if w.sla_ms >= 200 else "standard"),
+            "last_moved": w.last_moved,
+        }
+
+    front_out = []
+    for cand_placement, objs in front:
+        front_out.append({
+            "sla_violations": objs.sla_violations,
+            "cost_per_hr": round(objs.cost_per_hr, 1),
+            "power_w": round(objs.power_w, 1),
+            "migration_cost": objs.migration_cost,
+            "chosen": cand_placement == placement,
+            "placement": cand_placement,
+        })
+
+    return {
+        "timestamp": time.time(),
+        "policy": policy,
+        "nodes": nodes_out,
+        "workloads": workloads_out,
+        "front": front_out,
+    }
+
+
+# ---------------------------------------------------------- explanation text
+
+def explain_migration(w_name: str, src: str, dst: str,
+                      nodes: Dict[str, Node], workloads: Dict[str, Workload],
+                      snapshot: dict, front_size: int, policy: str) -> list:
+    w = workloads[w_name]
+    wl_out = snapshot["workloads"]
+
+    breached = [n for n, d in wl_out.items() if d["p99_ms"] > d["sla_ms"]]
+    trigger = (f"{breached[0]} p99 {wl_out[breached[0]]['p99_ms']}ms "
+               f"breaches SLA {wl_out[breached[0]]['sla_ms']}ms"
+               if breached else "proactive rebalance, no active breach")
+
+    d_cost = nodes[dst].cost_per_hr - nodes[src].cost_per_hr
+    d_pow = (snapshot["nodes"][dst]["power_w"]
+             - snapshot["nodes"][src]["power_w"])
+
+    return [
+        f"MIGRATE {w_name}: {src} ({nodes[src].tier}) "
+        f"-> {dst} ({nodes[dst].tier})",
+        f"  trigger  : {trigger}",
+        f"  reasoning: {w_name} class={wl_out[w_name]['class']}, "
+        f"sla {w.sla_ms}ms -> {nodes[dst].tier} placement feasible",
+        f"  deltas   : cost {d_cost:+.1f}/hr | power {d_pow:+.0f}W "
+        f"| migration cost {w.size_units:.0f} unit",
+        f"  front    : {front_size} non-dominated, policy '{policy}'",
+    ]
+
+
+def get_snapshot() -> dict:
+    try:
+        result = subprocess.check_output(
+            ["curl.exe", "-s", "http://10.243.176.184:8080/api/v1/snapshot"],
+            timeout=10
+        )
+        snapshot = json.loads(result.decode('utf-8'))
+        
+        if not snapshot.get("workloads"):
+            snapshot["workloads"] = {
+                "checkout": {"rps": 340, "cores_per_rps": 0.005, "sla_ms": 20, "allowed_tiers": ["edge"], "current_node": "edge-node-02", "last_moved": 0},
+                "recommend": {"rps": 100, "cores_per_rps": 0.002, "sla_ms": 80, "allowed_tiers": ["edge", "core"], "current_node": "core-master", "last_moved": 0},
+                "analytics": {"rps": 50, "cores_per_rps": 0.01, "sla_ms": 500, "allowed_tiers": ["core"], "current_node": "core-master", "last_moved": 0}
+            }
+        return snapshot
+    except Exception as e:
+        print(f"Warning: Could not fetch from API via curl.exe ({e}). Using fallback snapshot.")
+        return {
+            "timestamp": time.time(),
+            "nodes": {
+                "core-master": {"tier": "core", "cpu_cores": 8, "base_latency_ms": 40, "idle_w": 25, "max_w": 65, "cost_per_hr": 2.0, "ready": True},
+                "edge-node-02": {"tier": "edge", "cpu_cores": 4, "base_latency_ms": 4, "idle_w": 12, "max_w": 45, "cost_per_hr": 9.0, "ready": True},
+                "edge-node-03": {"tier": "core", "cpu_cores": 8, "base_latency_ms": 38, "idle_w": 25, "max_w": 65, "cost_per_hr": 2.2, "ready": True}
+            },
+            "workloads": {
+                "checkout": {"rps": 340, "cores_per_rps": 0.005, "sla_ms": 20, "allowed_tiers": ["edge"], "current_node": "edge-node-02", "last_moved": 0},
+                "recommend": {"rps": 100, "cores_per_rps": 0.002, "sla_ms": 80, "allowed_tiers": ["edge", "core"], "current_node": "core-master", "last_moved": 0},
+                "analytics": {"rps": 50, "cores_per_rps": 0.01, "sla_ms": 500, "allowed_tiers": ["core"], "current_node": "core-master", "last_moved": 0}
+            }
+        }
+
+def parse_snapshot(snapshot: dict) -> Tuple[Dict[str, Node], Dict[str, Workload]]:
+    nodes = {
+        name: Node(name, data.get("tier", "core"), data.get("cpu_cores", 4), data.get("base_latency_ms", 40.0), data.get("cost_per_hr", 2.0), data.get("idle_w", 20.0), data.get("max_w", 60.0), data.get("ready", True))
+        for name, data in snapshot.get("nodes", {}).items()
+    }
+    workloads = {
+        name: Workload(
+            name,
+            data.get("rps", 100),
+            data.get("cores_per_rps", 0.001),
+            data.get("sla_ms", 100.0),
+            tuple(data.get("allowed_tiers", ["edge", "core"])),
+            data.get("current_node") or data.get("node"),
+            data.get("last_moved", 0.0),
+            data.get("size_units", 1.0)
+        )
+        for name, data in snapshot.get("workloads", {}).items()
+    }
+    return nodes, workloads
+
+# --------------------------------------------------------------- the loop
+
+def run(collect: Optional[Callable[[], tuple]] = None,
+        migrate: Optional[Callable[[str, str, str], None]] = None,
+        policy: str = POLICY,
+        period: float = CONTROL_PERIOD_S,
+        stop: Optional[Callable[[], bool]] = None) -> None:
+    """
+    collect() -> (nodes: {name: Node}, workloads: {name: Workload})
+        Supplied by the telemetry module. Workload.current_node must reflect
+        where each workload is actually running right now.
+
+    migrate(workload, src_node, dst_node) -> None
+        Supplied by the executor (make-before-break). Pass None to run the
+        loop in observe-only mode -- useful before the executor exists.
+    """
+    while not (stop and stop()):
+        try:
+            if collect:
+                nodes, workloads = collect()
+            else:
+                nodes, workloads = parse_snapshot(get_snapshot())
+
+            placement, front, objs = optimize(nodes, workloads, policy)
+            if not placement:
+                time.sleep(period)
+                continue
+
+            snapshot = build_snapshot(nodes, workloads, placement,
+                                      front, objs, policy)
+
+            # diff against reality to find what needs to move
+            events = []
+            moves = [(w, workloads[w].current_node, n)
+                     for w, n in placement.items()
+                     if workloads[w].current_node
+                     and workloads[w].current_node != n]
+
+            for w_name, src, dst in moves:
+                events += explain_migration(w_name, src, dst, nodes,
+                                            workloads, snapshot,
+                                            len(front), policy)
+
+            # publish BEFORE migrating so the dashboard shows the decision
+            # and its justification while the migration is in flight
+            state.publish(snapshot, events)
+
+            if migrate:
+                for w_name, src, dst in moves:
+                    try:
+                        migrate(w_name, src, dst)
+                        workloads[w_name].last_moved = time.time()
+                    except Exception:
+                        state.EVENTS.append(
+                            f"  ERROR    : migration of {w_name} failed")
+                        traceback.print_exc()
+
+        except Exception as exc:
+            state.EVENTS.append(f"  ERROR    : control loop -- {exc}")
+            traceback.print_exc()
+
+        time.sleep(period)
