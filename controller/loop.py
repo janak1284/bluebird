@@ -160,9 +160,10 @@ def get_snapshot() -> dict:
         return {
             "timestamp": time.time(),
             "nodes": {
-                "core-master": {"tier": "core", "cpu_cores": 8, "base_latency_ms": 40, "idle_w": 25, "max_w": 65, "cost_per_hr": 2.0, "ready": True},
-                "edge-node-02": {"tier": "edge", "cpu_cores": 4, "base_latency_ms": 4, "idle_w": 12, "max_w": 45, "cost_per_hr": 9.0, "ready": True},
-                "edge-node-03": {"tier": "core", "cpu_cores": 8, "base_latency_ms": 38, "idle_w": 25, "max_w": 65, "cost_per_hr": 2.2, "ready": True}
+                "core-master": {"tier": "core", "zone": "core-1", "cpu_cores": 16.0, "base_latency_ms": 40.0, "idle_w": 7.5, "max_w": 30.0, "cost_per_hr": 2.0, "ready": True, "raw_hostname": "willson"},
+                "core-node-01": {"tier": "core", "zone": "core-2", "cpu_cores": 12.0, "base_latency_ms": 42.0, "idle_w": 25.0, "max_w": 135.0, "cost_per_hr": 2.1, "ready": True, "raw_hostname": "archlinux"},
+                "edge-node-01": {"tier": "edge", "zone": "edge-1", "cpu_cores": 8.0, "base_latency_ms": 4.0, "idle_w": 12.0, "max_w": 45.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "fedora"},
+                "edge-node-02": {"tier": "edge", "zone": "edge-2", "cpu_cores": 8.0, "base_latency_ms": 3.0, "idle_w": 8.0, "max_w": 35.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "desktop-prnd0ve"}
             },
             "workloads": {
                 "checkout": {"rps": 340, "cores_per_rps": 0.005, "sla_ms": 20, "allowed_tiers": ["edge"], "current_node": "edge-node-02", "last_moved": 0},

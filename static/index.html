@@ -1574,7 +1574,7 @@
                             <span class="w-2 h-2 rounded-full ${n.ready ? 'bg-emerald-500' : 'bg-red-500'}"></span>
                             <div>
                                 <h4 class="font-bold text-xs text-white light:text-slate-900">${escapeHtml(nName)}</h4>
-                                <span class="text-[10px] text-slate-400 mono">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}</span>
+                                <span class="text-[10px] text-slate-400 mono">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}${n.raw_hostname ? ` · ${escapeHtml(n.raw_hostname)}` : ''}</span>
                             </div>
                         </div>
                         <button onclick="toggleNodeStatus('${nName}')" class="text-[10px] font-bold px-3 py-1 rounded-lg ${n.ready ? 'bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-700/50' : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50'} transition-all">
@@ -1591,7 +1591,7 @@
                     <div class="p-3 bg-[#0a0b0d] light:bg-slate-100 rounded-xl border border-dark-border light:border-slate-200 text-xs">
                         <div class="flex justify-between items-center mb-1.5">
                             <span class="font-bold text-brand-400 mono">${escapeHtml(name)}</span>
-                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-200">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}</span>
+                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-200">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}${n.raw_hostname ? ` · ${escapeHtml(n.raw_hostname)}` : ''}</span>
                         </div>
                         <div class="grid grid-cols-4 gap-2 text-[10px] mono text-slate-400">
                             <div><span>Cores:</span> <b class="text-slate-200 light:text-slate-800">${n.cpu_cores}</b></div>
