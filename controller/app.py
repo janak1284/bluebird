@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from dashboard import router as dashboard_router
 from controller import loop
 
-SOURCE = "k8s"
+SOURCE = "sim"
 
 app = FastAPI(title="Edge-Core Orchestrator")
 app.include_router(dashboard_router)

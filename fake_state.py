@@ -24,6 +24,8 @@ from optimizer import Node, Workload, optimize, evaluate, explain, POLICIES
 LATEST: dict = {}
 HISTORY = deque(maxlen=300)
 EVENTS = deque(maxlen=100)
+TARGET_POLICY_MODE = "sla-first"
+ACTIVE_POLICY = "sla-first"
 
 CYCLE_S = 60.0
 CURRENT_POLICY = "sla-first"
@@ -236,7 +238,8 @@ def _build_snapshot(now: float) -> dict:
 
     return {
         "timestamp": now,
-        "policy": CURRENT_POLICY,
+        "policy_mode": TARGET_POLICY_MODE,
+        "policy": ACTIVE_POLICY,
         "nodes": nodes_out,
         "workloads": workloads_out,
         "front": front_out,
@@ -284,9 +287,11 @@ def start():
 
 # Interactive API helper methods
 def set_policy(policy: str) -> bool:
-    global CURRENT_POLICY
-    if policy in POLICIES:
+    global CURRENT_POLICY, TARGET_POLICY_MODE, ACTIVE_POLICY
+    if policy in POLICIES or policy == "auto":
         CURRENT_POLICY = policy
+        TARGET_POLICY_MODE = policy
+        ACTIVE_POLICY = policy
         return True
     return False
 

@@ -19,6 +19,7 @@ from typing import Optional
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).parent / "static"
 HISTORY_WINDOW_S = 60          # seconds of p99 history sent to the chart
@@ -162,8 +163,15 @@ def api_policies():
                 "badge": "Eco-Friendly",
                 "color": "teal",
             },
+            {
+                "id": "auto",
+                "name": "Auto (Metapolicy)",
+                "description": "Orchestration engine selects the optimal policy based on cluster state.",
+                "badge": "Dynamic",
+                "color": "blue",
+            },
         ],
-        "current": getattr(state, "CURRENT_POLICY", "sla-first"),
+        "current": getattr(state, "TARGET_POLICY_MODE", "sla-first"),
     })
 
 
@@ -176,13 +184,16 @@ async def api_set_policy(request: Request):
         if not policy:
             return JSONResponse({"ok": False, "error": "Missing policy parameter"}, status_code=400)
 
+        if policy not in ["sla-first", "cost-first", "green", "auto"]:
+            return JSONResponse({"error": "invalid policy"}, status_code=400)
+
         if hasattr(state, "set_policy"):
             success = state.set_policy(policy)
             if success:
                 return JSONResponse({"ok": True, "policy": policy, "message": f"Policy updated to {policy}"})
         
         # Fallback attribute set
-        state.CURRENT_POLICY = policy
+        state.TARGET_POLICY_MODE = policy
         return JSONResponse({"ok": True, "policy": policy, "message": f"Policy set to {policy}"})
     except Exception as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
