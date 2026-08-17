@@ -2,23 +2,70 @@
 import os
 import sys
 import time
+import glob
 import json
 import urllib.request
 import urllib.parse
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Node Profiles Configuration (PS-S04 Blueprint Section 4 - Power Profiles)
-# willson: Work laptop (iGPU, lower power draw: 10W idle / 35W max)
-# archlinux: Performance laptop (dGPU, higher power draw: 18W idle / 85W max)
+# Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
-    "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 10, "max_w": 35, "cpu_cores": 16, "total_mem_gb": 16},
-    "archlinux":    {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 18, "max_w": 85, "cpu_cores": 12, "total_mem_gb": 8},
-    "fedora":       {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12, "max_w": 45, "cpu_cores": 8,  "total_mem_gb": 8},
-    "desktop-prnd0ve": {"alias": "edge-node-03", "tier": "core", "zone": "core-2", "base_latency_ms": 38, "cost_per_hr": 2.2, "idle_w": 25, "max_w": 65, "cpu_cores": 8,  "total_mem_gb": 16},
+    "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
+    "archlinux":    {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
+    "fedora":       {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
+    "desktop-prnd0ve": {"alias": "edge-node-03", "tier": "core", "zone": "core-2", "base_latency_ms": 38, "cost_per_hr": 2.2, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
 }
 
 PROMETHEUS_URL = "http://localhost:9090/api/v1/query"
+
+_last_cpu_sample = {"idle": 0.0, "total": 0.0}
+
+def get_local_proc_stat_cpu_util():
+    """Reads real-time CPU utilization for local host directly from /proc/stat (exact Conky math)."""
+    global _last_cpu_sample
+    try:
+        with open('/proc/stat', 'r') as f:
+            line = f.readline()
+            parts = line.split()[1:]
+            values = [float(x) for x in parts]
+            idle = values[3] + values[4]  # idle + iowait
+            total = sum(values)
+            
+            dt_idle = idle - _last_cpu_sample["idle"]
+            dt_total = total - _last_cpu_sample["total"]
+            
+            _last_cpu_sample["idle"] = idle
+            _last_cpu_sample["total"] = total
+            
+            if dt_total > 0 and _last_cpu_sample["total"] > 0:
+                util = 1.0 - (dt_idle / dt_total)
+                return min(max(util, 0.0), 1.0)
+    except Exception:
+        pass
+    return None
+
+def get_real_sysfs_power_w():
+    """Reads actual physical power draw directly from Linux sysfs (exact interface Conky uses)."""
+    try:
+        power_files = glob.glob('/sys/class/power_supply/BAT*/power_now')
+        for pf in power_files:
+            with open(pf, 'r') as f:
+                val = float(f.read().strip())
+                if val > 0:
+                    return round(val / 1e6, 2)
+        
+        curr_files = glob.glob('/sys/class/power_supply/BAT*/current_now')
+        volt_files = glob.glob('/sys/class/power_supply/BAT*/voltage_now')
+        if curr_files and volt_files:
+            with open(curr_files[0], 'r') as fc, open(volt_files[0], 'r') as fv:
+                c = float(fc.read().strip()) / 1e6
+                v = float(fv.read().strip()) / 1e6
+                if c > 0 and v > 0:
+                    return round(c * v, 2)
+    except Exception:
+        pass
+    return None
 
 def get_kube_env():
     env = os.environ.copy()
@@ -27,7 +74,7 @@ def get_kube_env():
     return env
 
 def get_live_k3s_node_info():
-    """Queries K3s via kubectl to get live node readiness and IP mapping."""
+    """Queries K3s via kubectl to get live node readiness and internal IP mapping."""
     nodes = {}
     try:
         cmd = ["kubectl", "get", "nodes", "-o", "json"]
@@ -150,13 +197,16 @@ def generate_telemetry_snapshot():
     live_nodes_info = get_live_k3s_node_info()
     live_pods = get_live_k3s_pods()
     
-    cpu_query = '100 - (avg by (instance, node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+    cpu_query = '100 - (avg by (instance, node) (rate(node_cpu_seconds_total{mode="idle"}[6s])) * 100)'
     mem_avail_query = 'node_memory_MemAvailable_bytes'
     mem_total_query = 'node_memory_MemTotal_bytes'
     
     cpus = query_promql(cpu_query)
     mems_avail = query_promql(mem_avail_query)
     mems_total = query_promql(mem_total_query)
+    
+    real_sys_power = get_real_sysfs_power_w()
+    local_proc_cpu = get_local_proc_stat_cpu_util()
     
     nodes_data = {}
     for node_name, profile in NODE_PROFILES.items():
@@ -169,8 +219,15 @@ def generate_telemetry_snapshot():
             
         display_name = profile["alias"]
         
-        raw_cpu = cpus.get(node_ip, cpus.get(node_name, cpus.get(display_name, 5.0)))
-        cpu_u = min(max(raw_cpu / 100.0, 0.0), 1.0)
+        # Priority 1: Prometheus metric
+        raw_cpu = cpus.get(node_ip, cpus.get(node_name, cpus.get(display_name, None)))
+        if raw_cpu is not None:
+            cpu_u = min(max(raw_cpu / 100.0, 0.0), 1.0)
+        elif node_name == "willson" and local_proc_cpu is not None:
+            # Priority 2: Direct /proc/stat reader for local master host
+            cpu_u = local_proc_cpu
+        else:
+            cpu_u = 0.05
         
         avail_b = mems_avail.get(node_ip, mems_avail.get(node_name, 0))
         total_b = mems_total.get(node_ip, mems_total.get(node_name, profile["total_mem_gb"] * 1073741824))
@@ -180,7 +237,10 @@ def generate_telemetry_snapshot():
         else:
             mem_u = 0.56 if node_name == "willson" else 0.35
             
-        power_w = round(profile["idle_w"] + (profile["max_w"] - profile["idle_w"]) * cpu_u, 1)
+        if node_name == "willson" and real_sys_power is not None:
+            power_w = real_sys_power
+        else:
+            power_w = round(profile["idle_w"] + (profile["max_w"] - profile["idle_w"]) * cpu_u, 1)
 
         nodes_data[display_name] = {
             "node_name": display_name,
