@@ -224,14 +224,20 @@
             </div>
 
             <!-- Policy -->
-            <div class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm col-span-2 md:col-span-1">
-                <div class="flex items-center justify-between text-on-surface-variant mb-1">
-                    <span class="text-[11px] font-semibold uppercase tracking-wider">Active Policy</span>
-                    <span class="material-symbols-outlined text-primary text-base">tune</span>
-                </div>
-                <div class="text-base lg:text-lg font-bold text-primary truncate" id="kpi-policy">sla-first</div>
-                <span class="text-[10px] text-on-surface-variant mt-1">Multi-objective selector</span>
-            </div>
+        <div
+          class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm col-span-2 md:col-span-1">
+          <div class="flex items-center justify-between text-on-surface-variant mb-1">
+            <span class="text-[11px] font-semibold uppercase tracking-wider">Active Policy</span>
+            <span class="material-symbols-outlined text-primary text-base">tune</span>
+          </div>
+          <select id="kpi-policy" class="text-base lg:text-lg font-bold text-primary bg-transparent border-none p-0 cursor-pointer focus:ring-0 appearance-none hover:text-[#7091E6] transition-colors outline-none" onchange="setPolicy(this.value)">
+              <option value="sla-first">sla-first</option>
+              <option value="cost-first">cost-first</option>
+              <option value="green">green</option>
+              <option value="auto">auto</option>
+          </select>
+          <span class="text-[10px] text-on-surface-variant mt-1" id="kpi-policy-sub">Multi-objective selector</span>
+        </div>
         </div>
 
         <!-- Upper Grid: Topology + Live Telemetry -->
@@ -361,6 +367,20 @@
         });
     }
 
+    async function setPolicy(policyName) {
+      try {
+        const res = await fetch('/api/policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ policy: policyName })
+        });
+        if (!res.ok) throw new Error('Failed to update policy');
+      } catch (e) {
+        console.error(e);
+        alert("Failed to update policy");
+      }
+    }
+
     // 1. Update Connection & Header KPIs
     function updateHeaderAndKPIs(data) {
         const statusBadge = document.getElementById('status-badge');
@@ -407,10 +427,20 @@
         }
 
         const nodesEl = document.getElementById('kpi-nodes');
-        if (nodesEl) nodesEl.innerText = `${t.nodes_ready || 0}/${t.nodes_total || 0}`;
+      if (nodesEl) nodesEl.innerText = `${t.nodes_ready || 0}/${t.nodes_total || 0}`;
 
-        const polEl = document.getElementById('kpi-policy');
-        if (polEl) polEl.innerText = data.policy || 'sla-first';
+      const polEl = document.getElementById('kpi-policy');
+      const subEl = document.getElementById('kpi-policy-sub');
+      if (polEl && document.activeElement !== polEl) {
+        polEl.value = data.policy_mode || data.policy || 'sla-first';
+      }
+      if (subEl) {
+          if (data.policy_mode === 'auto') {
+              subEl.innerHTML = `auto &rarr; <span class="font-bold text-primary">${escapeHtml(data.policy)}</span>`;
+          } else {
+              subEl.innerText = "Multi-objective selector";
+          }
+      }
     }
 
     // 2. Render Topology Grid

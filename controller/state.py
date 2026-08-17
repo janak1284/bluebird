@@ -20,6 +20,11 @@ HISTORY = deque(maxlen=300)
 # Pre-formatted decision log lines, newest last. Rendered verbatim.
 EVENTS = deque(maxlen=50)
 
+# Current manual or auto mode
+TARGET_POLICY_MODE = "sla-first"
+# What actually ran this cycle
+ACTIVE_POLICY = "sla-first"
+
 
 def publish(snapshot: dict, events: list | None = None) -> None:
     """Atomically swap in a new snapshot and append any new log lines."""

@@ -22,6 +22,8 @@ from collections import deque
 LATEST: dict = {}
 HISTORY = deque(maxlen=300)
 EVENTS = deque(maxlen=50)
+TARGET_POLICY_MODE = "sla-first"
+ACTIVE_POLICY = "sla-first"
 
 CYCLE_S = 60.0
 
@@ -166,7 +168,8 @@ def _build(now: float) -> dict:
 
     return {
         "timestamp": now,
-        "policy": "sla-first",
+        "policy_mode": TARGET_POLICY_MODE,
+        "policy": ACTIVE_POLICY,
         "nodes": nodes_out,
         "workloads": workloads_out,
         "front": front,

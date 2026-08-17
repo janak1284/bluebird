@@ -15,16 +15,17 @@ This module is the only thing that knows about both.
 
 import time
 import json
+import os
 import subprocess
 import traceback
 from typing import Callable, Dict, Optional, Tuple
 
+from controller import state
+from controller.metapolicy import evaluate_meta_policy
 from optimizer import (Node, Workload, optimize, evaluate, node_load,
                        predicted_p99, node_power)
-from controller import state
 
 CONTROL_PERIOD_S = 2.0
-POLICY = "sla-first"
 
 
 # ------------------------------------------------------ snapshot conversion
@@ -115,12 +116,19 @@ def explain_migration(w_name: str, src: str, dst: str,
                f"breaches SLA {wl_out[breached[0]]['sla_ms']}ms"
                if breached else "proactive rebalance, no active breach")
 
-    d_cost = nodes[dst].cost_per_hr - nodes[src].cost_per_hr
-    d_pow = (snapshot["nodes"][dst]["power_w"]
-             - snapshot["nodes"][src]["power_w"])
+    old_placement = {wn: wk.current_node for wn, wk in workloads.items() if wk.current_node}
+    new_placement = old_placement.copy()
+    new_placement[w_name] = dst
+    
+    old_obj = evaluate(old_placement, nodes, workloads)
+    new_obj = evaluate(new_placement, nodes, workloads)
+    
+    d_cost = new_obj.cost_per_hr - old_obj.cost_per_hr
+    d_pow = new_obj.power_w - old_obj.power_w
 
+    src_tier = nodes[src].tier if src in nodes else "unknown"
     return [
-        f"MIGRATE {w_name}: {src} ({nodes[src].tier}) "
+        f"MIGRATE {w_name}: {src} ({src_tier}) "
         f"-> {dst} ({nodes[dst].tier})",
         f"  trigger  : {trigger}",
         f"  reasoning: {w_name} class={wl_out[w_name]['class']}, "
@@ -208,30 +216,27 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
 
 def run(collect: Optional[Callable[[], tuple]] = None,
         migrate: Optional[Callable[[str, str, str], None]] = None,
-        policy: str = POLICY,
         period: float = CONTROL_PERIOD_S,
         stop: Optional[Callable[[], bool]] = None) -> None:
-    """
-    collect() -> (nodes: {name: Node}, workloads: {name: Workload})
-        Supplied by the telemetry module. Workload.current_node must reflect
-        where each workload is actually running right now.
-
-    migrate(workload, src_node, dst_node) -> None
-        Supplied by the executor (make-before-break). Pass None to run the
-        loop in observe-only mode -- useful before the executor exists.
-    """
     static_nodes = {}
     if not collect:
         static_nodes = get_static_nodes()
 
     while not (stop and stop()):
         try:
+            mode = getattr(state, "TARGET_POLICY_MODE", "sla-first")
             raw_snapshot = None
             if collect:
                 nodes, workloads = collect()
             else:
                 raw_snapshot = get_snapshot()
                 nodes, workloads = parse_snapshot(raw_snapshot, static_nodes)
+
+            if mode == "auto":
+                policy = evaluate_meta_policy(nodes, workloads)
+            else:
+                policy = mode
+            state.ACTIVE_POLICY = policy
 
             placement, front, objs = optimize(nodes, workloads, policy)
             if not placement:
@@ -240,6 +245,7 @@ def run(collect: Optional[Callable[[], tuple]] = None,
 
             snapshot = build_snapshot(nodes, workloads, placement,
                                       front, objs, policy, raw_snapshot=raw_snapshot)
+            snapshot["policy_mode"] = mode
 
             # diff against reality to find what needs to move
             events = []

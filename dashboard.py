@@ -22,6 +22,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).parent / "static"
 HISTORY_WINDOW_S = 60          # seconds of p99 history sent to the chart
@@ -137,6 +138,17 @@ def api_history():
 def api_health():
     ts = (state.LATEST or {}).get("timestamp", 0.0)
     return {"ok": True, "controller_age_s": round(time.time() - ts, 2)}
+
+
+class PolicyUpdate(BaseModel):
+    policy: str
+
+@router.post("/api/policy")
+def api_update_policy(payload: PolicyUpdate):
+    if payload.policy not in ["sla-first", "cost-first", "green", "auto"]:
+        return JSONResponse({"error": "invalid policy"}, status_code=400)
+    state.TARGET_POLICY_MODE = payload.policy
+    return {"status": "ok", "policy": payload.policy}
 
 
 @router.get("/")
