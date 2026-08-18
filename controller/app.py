@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from dashboard import router as dashboard_router
 from controller import loop
 
-SOURCE = "sim"
+SOURCE = os.getenv("SOURCE", "k8s")
 
 app = FastAPI(title="Edge-Core Orchestrator")
 app.include_router(dashboard_router)
@@ -24,18 +24,25 @@ app.include_router(dashboard_router)
 
 def _wire():
     if SOURCE == "k8s":
-        # from controller.executor import migrate       # P4 builds this
-        return None, None
+        from controller.telemetry import collect, measured
+        import orchestration.scheduler as executor
+        print("[APP] Wired to real k8s telemetry and old orchestration scheduler")
+        
+        def migrate_wrapper(workload: str, src: str, dst: str):
+            executor.execute_make_before_break_migration(workload, dst)
+            
+        return collect, migrate_wrapper, measured
 
     from controller.simcollect import collect         # synthetic telemetry
-    return collect, None                              # observe-only
+    print("[APP] Wired to synthetic simcollect telemetry")
+    return collect, None, None                        # observe-only
 
 
 @app.on_event("startup")
 def _start():
-    collect, migrate = _wire()
+    collect, migrate, measured = _wire()
     threading.Thread(
         target=loop.run,
-        kwargs={"collect": collect, "migrate": migrate},
+        kwargs={"collect": collect, "migrate": migrate, "measured": measured},
         daemon=True,
     ).start()

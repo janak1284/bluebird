@@ -142,8 +142,9 @@ def explain_migration(w_name: str, src: str, dst: str,
 
 def get_snapshot() -> dict:
     try:
+        telemetry_url = os.getenv("TELEMETRY_URL", "http://localhost:8080/api/v1/snapshot")
         result = subprocess.check_output(
-            ["curl", "-s", "http://10.243.176.184:8080/api/v1/snapshot"],
+            ["curl", "-s", telemetry_url],
             timeout=10
         )
         snapshot = json.loads(result.decode('utf-8'))
@@ -161,7 +162,7 @@ def get_snapshot() -> dict:
             "timestamp": time.time(),
             "nodes": {
                 "core-master": {"tier": "core", "zone": "core-1", "cpu_cores": 16.0, "base_latency_ms": 40.0, "idle_w": 7.5, "max_w": 30.0, "cost_per_hr": 2.0, "ready": True, "raw_hostname": "willson"},
-                "core-node-01": {"tier": "core", "zone": "core-2", "cpu_cores": 12.0, "base_latency_ms": 42.0, "idle_w": 25.0, "max_w": 135.0, "cost_per_hr": 2.1, "ready": True, "raw_hostname": "archlinux"},
+                "edge-node-03": {"tier": "edge", "zone": "edge-3", "cpu_cores": 12.0, "base_latency_ms": 5.0, "idle_w": 25.0, "max_w": 135.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "archlinux"},
                 "edge-node-01": {"tier": "edge", "zone": "edge-1", "cpu_cores": 8.0, "base_latency_ms": 4.0, "idle_w": 12.0, "max_w": 45.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "fedora"},
                 "edge-node-02": {"tier": "edge", "zone": "edge-2", "cpu_cores": 8.0, "base_latency_ms": 3.0, "idle_w": 8.0, "max_w": 35.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "desktop-prnd0ve"}
             },
@@ -174,8 +175,9 @@ def get_snapshot() -> dict:
 
 def get_static_nodes() -> dict:
     try:
+        nodes_url = os.getenv("NODES_URL", "http://localhost:8080/api/v1/all-nodes")
         result = subprocess.check_output(
-            ["curl", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
+            ["curl", "-s", nodes_url],
             timeout=10
         )
         data = json.loads(result.decode('utf-8'))
@@ -219,7 +221,9 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
 def run(collect: Optional[Callable[[], tuple]] = None,
         migrate: Optional[Callable[[str, str, str], None]] = None,
         period: float = CONTROL_PERIOD_S,
-        stop: Optional[Callable[[], bool]] = None) -> None:
+        stop: Optional[Callable[[], bool]] = None,
+        measured: Optional[Callable] = None,
+        **kwargs) -> None:
     static_nodes = {}
     if not collect:
         static_nodes = get_static_nodes()
@@ -229,7 +233,11 @@ def run(collect: Optional[Callable[[], tuple]] = None,
             mode = getattr(state, "TARGET_POLICY_MODE", "sla-first")
             raw_snapshot = None
             if collect:
-                nodes, workloads = collect()
+                collect_res = collect()
+                if len(collect_res) == 3:
+                    nodes, workloads, raw_snapshot = collect_res
+                else:
+                    nodes, workloads = collect_res
             else:
                 raw_snapshot = get_snapshot()
                 nodes, workloads = parse_snapshot(raw_snapshot, static_nodes)
@@ -248,6 +256,15 @@ def run(collect: Optional[Callable[[], tuple]] = None,
             snapshot = build_snapshot(nodes, workloads, placement,
                                       front, objs, policy, raw_snapshot=raw_snapshot)
             snapshot["policy_mode"] = mode
+            if measured:
+                try:
+                    real_metrics = measured()
+                    for w_name, mets in real_metrics.items():
+                        if w_name in snapshot["workloads"]:
+                            snapshot["workloads"][w_name]["p99_ms"] = mets.get("p99_ms", snapshot["workloads"][w_name]["p99_ms"])
+                            snapshot["workloads"][w_name]["rps"] = mets.get("rps", snapshot["workloads"][w_name]["rps"])
+                except Exception as e:
+                    print(f"Failed to fetch measured telemetry: {e}")
 
             # diff against reality to find what needs to move
             events = []

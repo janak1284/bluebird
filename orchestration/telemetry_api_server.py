@@ -13,7 +13,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
     "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
-    "archlinux":    {"alias": "core-node-01", "tier": "core", "zone": "core-2", "base_latency_ms": 42, "cost_per_hr": 2.1, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
+    "archlinux":    {"alias": "edge-node-03", "tier": "edge", "zone": "edge-3", "base_latency_ms": 5, "cost_per_hr": 9.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
     "fedora":       {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
     "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
 }

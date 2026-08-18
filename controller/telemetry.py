@@ -21,8 +21,8 @@ def fetch_json(url: str, timeout: float = 2.0) -> dict:
         print(f"⚠️ Telemetry fetch from {url} failed: {e}")
     return {}
 
-def collect() -> Tuple[Dict[str, Node], Dict[str, Workload]]:
-    """Polls real Telemetry REST API server and returns (nodes, workloads) dataclass dicts for Optimizer."""
+def collect() -> Tuple[Dict[str, Node], Dict[str, Workload], dict]:
+    """Polls real Telemetry REST API server and returns (nodes, workloads, raw_snap) for Optimizer."""
     raw_snap = fetch_json(TELEMETRY_URL)
     raw_nodes = fetch_json(NODES_URL).get("nodes", {})
     
@@ -43,7 +43,8 @@ def collect() -> Tuple[Dict[str, Node], Dict[str, Workload]]:
         ready = n_data.get("ready", True) if name in snap_nodes else False
         
         node_obj = Node(name, tier, float(cores), float(base_lat), float(cost), float(idle_w), float(max_w), ready)
-        node_obj.zone = n_static.get("zone") or n_data.get("zone") or tier
+        # Store raw hostname on the object so the UI can display the real laptop name!
+        node_obj.raw_hostname = n_data.get("raw_hostname", "")
         nodes[name] = node_obj
 
     # Parse workload SLA profiles
@@ -80,7 +81,7 @@ def collect() -> Tuple[Dict[str, Node], Dict[str, Workload]]:
         )
         workloads[clean_name] = w_obj
 
-    return nodes, workloads
+    return nodes, workloads, raw_snap
 
 def measured() -> Dict[str, dict]:
     """Returns real measured P99 latency and RPS metrics per workload for dashboard display."""
