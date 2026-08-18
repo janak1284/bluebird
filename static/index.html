@@ -1,1666 +1,838 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html class="light" lang="en">
 <head>
     <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>MODW Orchestrator &mdash; Edge-Core Multi-Objective Dynamic Workload Control Center</title>
-
-    <!-- Tailwind CSS CDN -->
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>MODW Orchestrator &mdash; Multi-Objective Dynamic Workload Dashboard</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-
-    <!-- Chart.js for Latency Analytics & Radar Graphs -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-    <!-- Google Fonts & Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-
-    <script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
         tailwind.config = {
-            darkMode: 'class',
+            darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            100: '#e6ebf8',
-                            200: '#c2d0f0',
-                            300: '#9db4e8',
-                            400: '#7091E6', // Accents
-                            500: '#7091E6',
-                            600: '#5c7bd6',
-                            700: '#3D52A0',
-                            800: '#31448a',
-                            900: '#263573',
-                        },
-                        dark: {
-                            bg: '#EDE8F5',
-                            card: '#FFFFFF',
-                            elevated: '#F5F5F9',
-                            border: '#ADBBDA',
-                            hover: '#e2e5f0',
-                        }
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f1f3ff",
+                        "primary": "#233a87",
+                        "tertiary-fixed-dim": "#b2c5ff",
+                        "inverse-surface": "#233049",
+                        "on-background": "#0d1b33",
+                        "primary-container": "#3d52a0",
+                        "secondary-fixed-dim": "#b5c6f5",
+                        "on-primary-fixed": "#001552",
+                        "secondary": "#4d5e87",
+                        "surface-dim": "#ccdafa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#b7c4ff",
+                        "on-primary-fixed-variant": "#2b418e",
+                        "surface-container-highest": "#d7e3ff",
+                        "surface-bright": "#f9f9ff",
+                        "on-tertiary-container": "#bbccff",
+                        "background": "#f9f9ff",
+                        "on-primary-container": "#c0cbff",
+                        "tertiary-fixed": "#dae2ff",
+                        "on-secondary-container": "#465780",
+                        "surface": "#f9f9ff",
+                        "outline": "#757682",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#d9e2ff",
+                        "on-surface-variant": "#444651",
+                        "on-surface": "#0d1b33",
+                        "tertiary": "#0e3b8b",
+                        "on-primary": "#ffffff",
+                        "on-secondary-fixed-variant": "#35466e",
+                        "on-secondary-fixed": "#051a40",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#2f53a4",
+                        "inverse-on-surface": "#ecf0ff",
+                        "outline-variant": "#c5c5d3",
+                        "surface-container-high": "#dfe8ff",
+                        "on-tertiary-fixed": "#001847",
+                        "on-tertiary": "#ffffff",
+                        "surface-variant": "#d7e3ff",
+                        "surface-container": "#e8eeff",
+                        "surface-tint": "#4459a8",
+                        "on-tertiary-fixed-variant": "#1a4293",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#bdcefe",
+                        "primary-fixed": "#dce1ff",
+                        "inverse-primary": "#b7c4ff",
+                        "error-container": "#ffdad6",
+                        "custom-bg": "#EDE8F5"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.375rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "xs": "4px",
+                        "margin": "28px",
+                        "sm": "8px",
+                        "gutter": "18px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "xl": "48px",
+                        "base": "4px"
                     },
                     fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
+                        "sans": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
                     }
                 }
             }
         }
     </script>
-
     <style>
-        :root {
-            --bg-main: #EDE8F5;
-            --card-bg: #FFFFFF;
-            --border-color: #ADBBDA;
-        }
-
-        body, html {
-            background-color: var(--bg-main) !important;
-            color: #3D52A0 !important;
-        }
-
-        /* Metallic Chic Theme Enforcements */
-        .text-slate-100, .text-slate-200, .text-white, .text-slate-800, .text-slate-900 {
-            color: #3D52A0 !important;
-        }
+        body { background-color: #EDE8F5; font-family: 'Inter', sans-serif; }
+        .card-border { border: 1px solid #8697C4; }
+        .focus-border:focus-within { border: 2px solid #7091E6; outline: none; }
+        .bg-card-bg { background-color: #ADBBDA; }
+        .text-accent { color: #7091E6; }
+        .terminal-text { font-family: 'JetBrains Mono', monospace; }
         
-        .text-slate-300, .text-slate-400, .text-slate-500, .text-slate-600 {
-            color: #8697C4 !important;
-        }
+        /* Custom scrollbar */
+        .terminal-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: transparent; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #8697C4; border-radius: 3px; }
+        .terminal-scroll::-webkit-scrollbar-thumb:hover { background: #7091E6; }
 
-        [class*="bg-[#0a0b0d]"], [class*="bg-slate-100"], [class*="bg-slate-50"] {
-            background-color: #EDE8F5 !important;
-        }
-
-        [class*="from-[#1a1d24]"], .bg-dark-card, .bg-white {
-            background: #FFFFFF !important;
-        }
-
-        .border-dark-border, .border-slate-200, .border-slate-300, [class*="border-[#2a2e38]"] {
-            border-color: #ADBBDA !important;
-        }
-
-        .mono { font-family: 'JetBrains Mono', monospace; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-
-        /* Migration Flash Animation */
-        @keyframes migrationGlow {
-            0% { transform: scale(1.04); box-shadow: 0 0 20px rgba(59, 130, 246, 0.9); border-color: #3b82f6; }
-            50% { transform: scale(1.02); box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        @keyframes flashMigrate {
+            0% { transform: scale(1.08); box-shadow: 0 0 12px rgba(112, 145, 230, 0.8); background-color: #7091E6; color: #ffffff; }
             100% { transform: scale(1.0); }
         }
         .animate-migrate {
-            animation: migrationGlow 2.2s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        /* View Transition */
-        .tab-view {
-            display: none;
-            opacity: 0;
-            transition: opacity 0.15s ease-in-out;
-        }
-        .tab-view.active {
-            display: block;
-            opacity: 1;
-        }
-
-        /* Toast animation */
-        @keyframes toastIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .toast-enter {
-            animation: toastIn 0.25s ease-out forwards;
+            animation: flashMigrate 1.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white dark:text-slate-100 light:text-slate-800 light:bg-slate-50">
+<body class="text-on-surface antialiased min-h-screen flex">
 
-    <!-- ========================================================================= -->
-    <!-- UNIFIED TOP HEADER & COCKPIT CONTROL BAR (56px fixed height)              -->
-    <!-- ========================================================================= -->
-    <header class="h-14 bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]/95 light:bg-white/95 backdrop-blur border-b border-dark-border light:border-slate-200 fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-3 md:px-5">
-        
-        <!-- Left: Branding & Connection Seam Badge -->
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2">
-                <div class="hidden sm:flex flex-col">
-                    <span class="font-extrabold text-sm tracking-tight text-white light:text-slate-900 leading-none">MODW Orchestrator</span>
-                    <span class="text-[10px] text-slate-400 font-medium leading-tight">Edge-Core Placement Engine</span>
-                </div>
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low border-r border-outline-variant fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col py-md hidden md:flex z-40">
+    <div class="px-md mb-lg">
+        <div class="flex items-center gap-md">
+            <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                MODW
             </div>
-
-            <div class="h-4 w-px bg-dark-border light:bg-slate-300 hidden md:block"></div>
-
-            <!-- Seam Connection Status Pill -->
-            <div id="seam-pill" class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-800/40">
-                <span id="seam-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="seam-text" class="mono font-bold text-[10px]">LIVE &middot; state.py</span>
-                <span id="seam-age" class="text-[10px] text-slate-400 mono hidden sm:inline">(0.0s)</span>
+            <div>
+                <h3 class="font-bold text-sm text-primary">MODW Orchestrator</h3>
+                <p class="text-xs text-on-surface-variant" id="sidebar-status-sub">State Engine Live</p>
             </div>
         </div>
-
-        <!-- Center: Single Unified Navigation Pill Bar -->
-        <nav class="flex items-center bg-[#0a0b0d]/90 light:bg-slate-100 p-1 rounded-xl border border-dark-border light:border-slate-200 gap-0.5 overflow-x-auto max-w-[50vw] sm:max-w-none custom-scroll">
-            <button onclick="switchTab('cockpit')" id="nav-cockpit" class="nav-btn active flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-sm">
-                <span class="material-symbols-outlined text-[15px]">dashboard</span>
-                <span>Cockpit</span>
-            </button>
-            <button onclick="switchTab('pareto')" id="nav-pareto" class="nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
-                <span class="material-symbols-outlined text-[15px]">scatter_plot</span>
-                <span>Pareto Front</span>
-                <span id="badge-pareto-count" class="mono text-[9px] px-1.5 py-0.2 rounded-full bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-slate-200 font-bold">0</span>
-            </button>
-            <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
-                <span class="material-symbols-outlined text-[15px]">query_stats</span>
-                <span>Latency</span>
-            </button>
-            <button onclick="switchTab('logs')" id="nav-logs" class="nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
-                <span class="material-symbols-outlined text-[15px]">terminal</span>
-                <span>Decision Logs</span>
-                <span id="badge-logs-count" class="mono text-[9px] px-1.5 py-0.2 rounded-full bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-slate-200 font-bold">0</span>
-            </button>
-            <button onclick="switchTab('chaos')" id="nav-chaos" class="nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
-                <span class="material-symbols-outlined text-[15px]">science</span>
-                <span>Simulator &amp; Chaos</span>
-            </button>
-            <button onclick="switchTab('config')" id="nav-config" class="nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
-                <span class="material-symbols-outlined text-[15px]">settings</span>
-                <span>Specs</span>
-            </button>
-        </nav>
-
-        <!-- Right: Policy Switcher, Chaos Quick Trigger, Clock & Theme -->
-        <div class="flex items-center gap-2">
-            
-            <!-- Policy Dropdown Switcher -->
-            <div class="relative flex items-center">
-                <div class="flex items-center bg-[#0a0b0d] light:bg-slate-100 rounded-lg border border-dark-border light:border-slate-200 p-0.5">
-                    <span class="text-[10px] text-slate-400 uppercase font-bold px-1.5 hidden lg:inline">Policy:</span>
-                    <select id="policy-select" onchange="onPolicyChange(this.value)" class="bg-transparent text-xs font-bold text-brand-400 light:text-brand-600 mono focus:outline-none border-none py-1 pl-1 pr-6 cursor-pointer rounded">
-                        <option value="sla-first" class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] text-white">SLA-First (Reliability)</option>
-                        <option value="cost-first" class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] text-white">Cost-First (Economic)</option>
-                        <option value="green" class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] text-white">Green (Eco/Power)</option>
-                    </select>
-                </div>
+    </div>
+    <div class="flex-1 flex flex-col gap-sm px-sm">
+        <button onclick="switchTab('topology')" id="tab-topology" class="flex items-center gap-md px-md py-sm rounded-lg text-primary bg-secondary-container/30 font-bold border-r-4 border-primary transition-all w-full text-left">
+            <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">hub</span>
+            <span class="text-xs font-semibold uppercase tracking-wider">Topology</span>
+        </button>
+        <button onclick="switchTab('telemetry')" id="tab-telemetry" class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors border-r-4 border-transparent w-full text-left">
+            <span class="material-symbols-outlined text-xl">analytics</span>
+            <span class="text-xs font-semibold uppercase tracking-wider">Telemetry</span>
+        </button>
+        <button onclick="switchTab('log')" id="tab-log" class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors border-r-4 border-transparent w-full text-left">
+            <span class="material-symbols-outlined text-xl">terminal</span>
+            <span class="text-xs font-semibold uppercase tracking-wider">Explainability</span>
+        </button>
+        <button onclick="switchTab('pareto')" id="tab-pareto" class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors border-r-4 border-transparent w-full text-left">
+            <span class="material-symbols-outlined text-xl">query_stats</span>
+            <span class="text-xs font-semibold uppercase tracking-wider">Pareto Front</span>
+        </button>
+    </div>
+    <div class="px-md mt-auto">
+        <div class="p-sm bg-surface-container rounded-lg border border-outline-variant/60 text-xs text-on-surface-variant flex flex-col gap-1 mb-2">
+            <div class="flex justify-between font-semibold">
+                <span>Data Source:</span>
+                <span class="text-primary font-mono" id="data-source-label">state.py</span>
             </div>
+            <div class="flex justify-between">
+                <span>Polling:</span>
+                <span class="text-green-700 font-medium">1000ms loop</span>
+            </div>
+        </div>
+    </div>
+</nav>
 
-            <!-- Quick Surge Button -->
-            <button onclick="quickSurgeToggle()" id="btn-quick-surge" class="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 transition-all" title="Trigger high checkout surge (750 req/s)">
-                <span class="material-symbols-outlined text-xs">bolt</span>
-                <span id="quick-surge-text">Spike Traffic</span>
-            </button>
-
-            <!-- Live Clock -->
-            <div id="clock-ticker" class="hidden xl:flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#0a0b0d] light:bg-slate-100 text-slate-300 light:text-slate-600 border border-dark-border light:border-slate-200 mono">
-                <span class="material-symbols-outlined text-xs text-slate-400">schedule</span>
+<!-- Main Content Wrapper -->
+<div class="flex-1 md:ml-64 flex flex-col min-h-screen">
+    <!-- TopNavBar -->
+    <header class="bg-surface text-primary font-bold flex justify-between items-center px-margin h-16 w-full fixed top-0 z-50 border-b border-outline-variant">
+        <div class="flex items-center gap-md">
+            <span class="text-lg tracking-tight">Edge-Core Orchestrator</span>
+            <div id="status-badge" class="flex items-center gap-xs bg-green-100 px-sm py-[3px] rounded-full border border-green-400/40">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse"></div>
+                <span id="status-text" class="text-[10px] font-bold text-green-800 uppercase tracking-wider">Live &middot; state.py</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-lg">
+            <div class="font-mono text-xs text-on-surface-variant bg-surface-container px-sm py-xs rounded border border-outline-variant" id="live-clock">
                 00:00:00 UTC
             </div>
-
-            <!-- Light/Dark Mode Toggle -->
-            <button onclick="toggleTheme()" class="w-8 h-8 rounded-lg flex items-center justify-center bg-[#0a0b0d] light:bg-slate-100 text-slate-300 light:text-slate-700 hover:text-white border border-dark-border light:border-slate-200 transition-all" title="Toggle Theme">
-                <span class="material-symbols-outlined text-sm" id="theme-icon">light_mode</span>
-            </button>
+            <div class="flex items-center gap-xs text-xs font-medium text-on-surface-variant bg-surface-container px-sm py-xs rounded border border-outline-variant">
+                <span>Age:</span>
+                <span class="font-mono font-bold text-primary" id="snapshot-age">0.0s</span>
+            </div>
         </div>
     </header>
 
-    <!-- ========================================================================= -->
-    <!-- COMPACT GLOBAL TELEMETRY RIBBON (42px height)                             -->
-    <!-- ========================================================================= -->
-    <div class="mt-14 h-11 bg-[#0a0b0d]/95 light:bg-slate-100/95 border-b border-dark-border light:border-slate-200 px-3 md:px-5 flex items-center justify-between z-40 text-xs overflow-x-auto custom-scroll">
-        <div class="flex items-center gap-4 lg:gap-8 min-w-max">
+    <!-- Main Canvas -->
+    <main class="flex-1 mt-16 p-md lg:p-margin flex flex-col gap-gutter">
+
+        <!-- KPI Summary Cards Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-sm lg:gap-gutter">
+            <!-- Cost per hour -->
+            <div class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm">
+                <div class="flex items-center justify-between text-on-surface-variant mb-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider">Total Cost</span>
+                    <span class="material-symbols-outlined text-primary text-base">payments</span>
+                </div>
+                <div class="text-xl lg:text-2xl font-bold text-primary" id="kpi-cost">&mdash;</div>
+                <span class="text-[10px] text-on-surface-variant mt-1">Per hour active compute</span>
+            </div>
+
+            <!-- Total Power -->
+            <div class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm">
+                <div class="flex items-center justify-between text-on-surface-variant mb-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider">Total Power</span>
+                    <span class="material-symbols-outlined text-amber-600 text-base">bolt</span>
+                </div>
+                <div class="text-xl lg:text-2xl font-bold text-on-surface" id="kpi-power">&mdash;</div>
+                <span class="text-[10px] text-on-surface-variant mt-1">Combined cluster wattage</span>
+            </div>
+
+            <!-- SLA Violations -->
+            <div class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm">
+                <div class="flex items-center justify-between text-on-surface-variant mb-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider">SLA Breaches</span>
+                    <span class="material-symbols-outlined text-error text-base">warning</span>
+                </div>
+                <div class="text-xl lg:text-2xl font-bold text-green-600" id="kpi-violations">0</div>
+                <span class="text-[10px] text-on-surface-variant mt-1">Workloads with p99 > SLA</span>
+            </div>
+
+            <!-- Active Nodes -->
+            <div class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm">
+                <div class="flex items-center justify-between text-on-surface-variant mb-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider">Cluster Nodes</span>
+                    <span class="material-symbols-outlined text-primary text-base">dns</span>
+                </div>
+                <div class="text-xl lg:text-2xl font-bold text-on-surface" id="kpi-nodes">&mdash;</div>
+                <span class="text-[10px] text-on-surface-variant mt-1">Nodes healthy and ready</span>
+            </div>
+
+            <!-- Policy -->
+        <div
+          class="bg-surface rounded-lg card-border p-sm lg:p-md flex flex-col justify-between shadow-sm col-span-2 md:col-span-1">
+          <div class="flex items-center justify-between text-on-surface-variant mb-1">
+            <span class="text-[11px] font-semibold uppercase tracking-wider">Active Policy</span>
+            <span class="material-symbols-outlined text-primary text-base">tune</span>
+          </div>
+          <select id="kpi-policy" class="text-base lg:text-lg font-bold text-primary bg-transparent border-none p-0 cursor-pointer focus:ring-0 appearance-none hover:text-[#7091E6] transition-colors outline-none" onchange="setPolicy(this.value)">
+              <option value="sla-first">sla-first</option>
+              <option value="cost-first">cost-first</option>
+              <option value="green">green</option>
+              <option value="auto">auto</option>
+          </select>
+          <span class="text-[10px] text-on-surface-variant mt-1" id="kpi-policy-sub">Multi-objective selector</span>
+        </div>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="flex-1 flex flex-col min-h-0 relative">
             
-            <!-- KPI 1: Cost Rate -->
-            <div class="flex items-center gap-1.5">
-                <span class="text-slate-400 text-[11px]">Billed Rate:</span>
-                <span id="kpi-cost" class="mono font-bold text-white light:text-slate-900 text-sm">₹0.00/hr</span>
-            </div>
-
-            <div class="h-3 w-px bg-dark-border light:bg-slate-300"></div>
-
-            <!-- KPI 2: Total Power -->
-            <div class="flex items-center gap-1.5">
-                <span class="text-slate-400 text-[11px]">Power Draw:</span>
-                <span id="kpi-power" class="mono font-bold text-amber-400 text-sm">0.0 W</span>
-            </div>
-
-            <div class="h-3 w-px bg-dark-border light:bg-slate-300"></div>
-
-            <!-- KPI 3: SLA Status -->
-            <div class="flex items-center gap-1.5">
-                <span class="text-slate-400 text-[11px]">SLA Health:</span>
-                <span id="kpi-violations" class="mono font-bold px-2 py-0.5 rounded text-xs bg-emerald-950 text-emerald-400 border border-emerald-800/40">0 Breaches</span>
-            </div>
-
-            <div class="h-3 w-px bg-dark-border light:bg-slate-300"></div>
-
-            <!-- KPI 4: Active Nodes -->
-            <div class="flex items-center gap-1.5">
-                <span class="text-slate-400 text-[11px]">Online Nodes:</span>
-                <span id="kpi-nodes" class="mono font-bold text-slate-200 light:text-slate-800 text-xs">4/4 Ready</span>
-            </div>
-
-            <div class="h-3 w-px bg-dark-border light:bg-slate-300"></div>
-
-            <!-- KPI 5: Active Policy -->
-            <div class="flex items-center gap-1.5">
-                <span class="text-slate-400 text-[11px]">Active Selection:</span>
-                <span id="kpi-policy-badge" class="mono text-[10px] uppercase font-extrabold px-2 py-0.5 rounded bg-brand-900/60 text-brand-300 border border-brand-700/40">sla-first</span>
-            </div>
-        </div>
-
-        <!-- Right Simulation / Cycle Phase Status -->
-        <div class="hidden md:flex items-center gap-2">
-            <span class="text-[10px] text-slate-400 uppercase font-semibold">Cycle Phase:</span>
-            <div class="w-24 h-2 bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-slate-200 rounded-full overflow-hidden border border-dark-border light:border-slate-300">
-                <div id="cycle-progress-bar" class="h-full bg-brand-500 rounded-full transition-all duration-300" style="width: 25%"></div>
-            </div>
-            <span id="cycle-phase-label" class="mono text-[10px] text-slate-400">15s/60s</span>
-        </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- MAIN APPLICATION WORKSPACE (Cohesive views, no unnecessary scrolling)       -->
-    <!-- ========================================================================= -->
-    <main class="flex-1 p-3 md:p-4 overflow-y-auto max-w-[1700px] w-full mx-auto">
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 1: COCKPIT (ALL-IN-ONE COMPACT LIVE COMMAND CENTER)              -->
-        <!-- ===================================================================== -->
-        <div id="view-cockpit" class="tab-view active">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-
-                <!-- COL 1 (5 cols): Cluster Topology & Node Cards -->
-                <section class="lg:col-span-5 flex flex-col gap-3">
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-3 flex justify-between items-center shadow-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-brand-400 text-lg">dns</span>
-                            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-200 light:text-slate-800">Cluster Nodes &amp; Placement</h2>
-                        </div>
-                        <span id="node-count-badge" class="mono text-[11px] px-2 py-0.5 rounded-full bg-[#0a0b0d] light:bg-slate-100 text-slate-300 light:text-slate-700 font-bold border border-dark-border light:border-slate-200">4 Nodes</span>
-                    </div>
-
-                    <!-- Nodes Grid -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="cockpit-nodes-container">
-                        <!-- Populated by JS with rich Node Cards -->
-                        <div class="col-span-2 py-16 text-center text-slate-400 text-xs">
-                            <span class="material-symbols-outlined animate-spin text-2xl mb-1 text-brand-500">sync</span>
-                            <div>Streaming topology snapshot...</div>
+            <!-- Cluster Topology Section -->
+            <section id="topology-section" class="tab-content flex-1 bg-surface rounded-lg card-border overflow-hidden flex flex-col shadow-sm absolute inset-0">
+                <div class="px-md py-sm border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+                    <h2 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-sm">
+                        <span class="material-symbols-outlined text-base">hub</span>
+                        Active Cluster Topology &amp; Placements
+                    </h2>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary" id="topology-count">Loading nodes...</span>
+                </div>
+                <div class="p-md flex-1 bg-surface-container-lowest overflow-y-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-md" id="topology-grid">
+                        <div class="col-span-full py-12 text-center text-on-surface-variant text-sm">
+                            <span class="material-symbols-outlined animate-spin text-2xl mb-2 text-primary">sync</span>
+                            <div>Connecting to state.py telemetry seam...</div>
                         </div>
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <!-- COL 2 (4 cols): Workload SLA Compliance & Real-Time Telemetry -->
-                <section class="lg:col-span-4 flex flex-col gap-3">
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-3 flex justify-between items-center shadow-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-emerald-400 text-lg">timer</span>
-                            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-200 light:text-slate-800">Workload SLA Compliance</h2>
-                        </div>
-                        <span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/40">REAL-TIME</span>
+            <!-- Live Telemetry Panel -->
+            <section id="telemetry-section" class="tab-content hidden flex-1 bg-surface rounded-lg card-border overflow-hidden flex flex-col shadow-sm absolute inset-0">
+                <div class="px-md py-sm border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+                    <h2 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-sm">
+                        <span class="material-symbols-outlined text-base text-red-600">monitor_heart</span>
+                        Live Telemetry &amp; Workload Latencies
+                    </h2>
+                    <div class="flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-[10px] uppercase font-bold text-green-700">Real-Time</span>
                     </div>
-
-                    <!-- Workloads Cards Container -->
-                    <div class="flex flex-col gap-2.5" id="cockpit-workloads-container">
-                        <!-- Populated by JS -->
+                </div>
+                <div class="p-md flex-1 overflow-y-auto terminal-scroll bg-surface-container-lowest flex flex-col gap-sm" id="telemetry-container">
+                    <div class="p-8 text-center text-on-surface-variant text-xs">
+                        Awaiting live telemetry streams...
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <!-- COL 3 (3 cols): Mini Latency Sparkline & Decision Stream Feed -->
-                <section class="lg:col-span-3 flex flex-col gap-3">
-                    
-                    <!-- Mini Latency Streamer -->
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-3 flex flex-col shadow-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <div class="flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-brand-400 text-base">show_chart</span>
-                                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-200 light:text-slate-800">Live p99 Stream</h3>
-                            </div>
-                            <button onclick="switchTab('analytics')" class="text-[10px] text-brand-400 hover:text-brand-300 font-semibold flex items-center">
-                                Deep-Dive &rarr;
-                            </button>
-                        </div>
-                        <div class="h-28 w-full">
-                            <canvas id="mini-latency-chart" class="w-full h-full"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Live Decision Log Streamer -->
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 flex flex-col flex-1 shadow-sm overflow-hidden">
-                        <div class="p-3 border-b border-dark-border light:border-slate-200 flex justify-between items-center bg-[#0a0b0d]/60 light:bg-slate-50">
-                            <div class="flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-amber-400 text-base">terminal</span>
-                                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-200 light:text-slate-800">Live Decision Stream</h3>
-                            </div>
-                            <button onclick="switchTab('logs')" class="text-[10px] text-brand-400 hover:text-brand-300 font-semibold">
-                                Full Logs &rarr;
-                            </button>
-                        </div>
-                        <div class="p-2.5 text-[11px] mono text-slate-300 light:text-slate-700 overflow-y-auto max-h-64 custom-scroll flex flex-col gap-1.5" id="mini-decision-stream">
-                            <div class="text-slate-500">&gt; Connected to state.py decision seam...</div>
-                        </div>
-                    </div>
-
-                </section>
-            </div>
-        </div>
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 2: PARETO FRONTIER & MULTI-OBJECTIVE SOLVER WORKSPACE           -->
-        <!-- ===================================================================== -->
-        <div id="view-pareto" class="tab-view">
-            <div class="flex flex-col gap-4">
-                
-                <!-- Pareto Header & Summary -->
-                <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-brand-400 text-xl">scatter_plot</span>
-                            <h2 class="text-sm font-black uppercase tracking-wider text-white light:text-slate-900">Non-Dominated Pareto Placement Candidates</h2>
-                        </div>
-                        <p class="text-xs text-slate-400 mt-1">
-                            Evaluated exhaustively across SLA breaches, breach severity, hourly cost (₹), power wattage (W), and migration friction. No arbitrary weights.
-                        </p>
-                    </div>
-
+            <!-- Explainability Log -->
+            <section id="log-section" class="tab-content hidden flex-1 bg-[#0d1b33] rounded-lg card-border overflow-hidden flex flex-col shadow-sm absolute inset-0">
+                <div class="px-md py-sm border-b border-[#233049] flex justify-between items-center bg-[#051a40]">
+                    <h2 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-sm">
+                        <span class="material-symbols-outlined text-base text-yellow-400">terminal</span>
+                        Orchestrator Decision &amp; Migration Log
+                    </h2>
                     <div class="flex items-center gap-2">
-                        <span class="mono text-xs px-3 py-1 rounded-lg bg-[#0a0b0d] light:bg-slate-100 text-brand-400 font-bold border border-dark-border light:border-slate-200" id="pareto-candidates-count">
-                            0 Candidates Found
-                        </span>
+                        <span class="text-[10px] text-[#8697C4] font-mono" id="log-count">0 events</span>
+                        <div class="flex gap-1.5 ml-2">
+                            <div class="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Pareto Candidates Table -->
-                <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 overflow-hidden shadow-sm">
-                    <div class="overflow-x-auto custom-scroll">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr class="border-b border-dark-border light:border-slate-200 bg-[#0a0b0d]/80 light:bg-slate-100 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                                    <th class="p-3">Candidate Status</th>
-                                    <th class="p-3">SLA Violations</th>
-                                    <th class="p-3">Billed Cost (₹/hr)</th>
-                                    <th class="p-3">Cluster Power (W)</th>
-                                    <th class="p-3">Migration Weight</th>
-                                    <th class="p-3">Placement Architecture</th>
-                                    <th class="p-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pareto-table-body" class="divide-y divide-dark-border light:divide-slate-200">
-                                <tr>
-                                    <td colspan="7" class="p-8 text-center text-slate-400">Evaluating candidate placements...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="p-md flex-1 overflow-y-auto terminal-scroll text-xs text-[#b2c5ff] terminal-text leading-relaxed flex flex-col gap-1" id="explainability-log">
+                    <div class="text-[#757682]">&gt; Initializing MODW Orchestrator seam with state.py...</div>
+                    <div class="text-[#757682]">&gt; Polling /api/state for real-time telemetry and Pareto decisions...</div>
                 </div>
+            </section>
 
-                <!-- Policy Comparison Matrix -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                    <div class="p-4 bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 border-t-4 border-t-emerald-500 shadow-sm">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <h4 class="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1">
-                                <span class="material-symbols-outlined text-sm">verified_user</span> SLA-First (Reliability)
-                            </h4>
-                            <button onclick="onPolicyChange('sla-first')" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 hover:bg-emerald-900 border border-emerald-700/50">Apply</button>
-                        </div>
-                        <p class="text-[11px] text-slate-400 leading-relaxed">
-                            Prioritizes zero SLA breaches and minimal tail latency above all else. Migrations, cost, and power are strictly secondary tiebreakers.
-                        </p>
-                    </div>
-
-                    <div class="p-4 bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 border-t-4 border-t-amber-500 shadow-sm">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <h4 class="text-xs font-bold text-amber-400 uppercase flex items-center gap-1">
-                                <span class="material-symbols-outlined text-sm">payments</span> Cost-First (Economic)
-                            </h4>
-                            <button onclick="onPolicyChange('cost-first')" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 hover:bg-amber-900 border border-amber-700/50">Apply</button>
-                        </div>
-                        <p class="text-[11px] text-slate-400 leading-relaxed">
-                            Minimizes monetary expenditure per hour, packing workloads into the cheapest compute tiers (e.g. core) within legal constraints.
-                        </p>
-                    </div>
-
-                    <div class="p-4 bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 border-t-4 border-t-teal-500 shadow-sm">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <h4 class="text-xs font-bold text-teal-400 uppercase flex items-center gap-1">
-                                <span class="material-symbols-outlined text-sm">eco</span> Green (Eco-Power)
-                            </h4>
-                            <button onclick="onPolicyChange('green')" class="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 hover:bg-teal-900 border border-teal-700/50">Apply</button>
-                        </div>
-                        <p class="text-[11px] text-slate-400 leading-relaxed">
-                            Optimizes for minimum total cluster wattage, consolidating workloads onto low-power hardware profiles to reduce energy footprint.
-                        </p>
-                    </div>
+            <!-- Pareto Front Candidate Placements Table -->
+            <section id="pareto-section" class="tab-content hidden flex-1 bg-surface rounded-lg card-border overflow-hidden flex flex-col shadow-sm absolute inset-0">
+                <div class="px-md py-sm border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+                    <h2 class="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-sm">
+                        <span class="material-symbols-outlined text-base">table_chart</span>
+                        Pareto Front &mdash; Non-Dominated Solutions
+                    </h2>
+                    <span class="text-[11px] text-on-surface-variant font-mono" id="pareto-cap">&mdash;</span>
                 </div>
-
-            </div>
-        </div>
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 3: LATENCY ANALYTICS WORKSTATION                                -->
-        <!-- ===================================================================== -->
-        <div id="view-analytics" class="tab-view">
-            <div class="flex flex-col gap-4">
-                
-                <!-- Main Latency Chart Container -->
-                <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                    <div class="flex flex-wrap justify-between items-center gap-3 pb-3 border-b border-dark-border light:border-slate-200">
-                        <div>
-                            <h2 class="text-sm font-black uppercase tracking-wider text-white light:text-slate-900 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-brand-400">query_stats</span>
-                                Rolling p99 Latency vs SLA Trajectory
-                            </h2>
-                            <p class="text-xs text-slate-400 mt-0.5">Continuous p99 latency history updated from M/M/1 queuing physics and base network delays.</p>
-                        </div>
-
-                        <!-- Chart Controls: Time Window & Pause -->
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <div class="flex items-center bg-[#0a0b0d] light:bg-slate-100 p-0.5 rounded-lg border border-dark-border light:border-slate-200 text-xs">
-                                <span class="text-slate-400 text-[10px] px-2 font-bold uppercase">Window:</span>
-                                <button onclick="setChartWindow(30)" id="btn-win-30" class="px-2 py-0.5 rounded text-slate-400 font-semibold">30s</button>
-                                <button onclick="setChartWindow(60)" id="btn-win-60" class="px-2 py-0.5 rounded bg-brand-600 text-white font-bold">60s</button>
-                                <button onclick="setChartWindow(120)" id="btn-win-120" class="px-2 py-0.5 rounded text-slate-400 font-semibold">120s</button>
-                            </div>
-
-                            <button onclick="toggleChartPause()" id="btn-chart-pause" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#0a0b0d] light:bg-slate-100 text-slate-300 light:text-slate-700 border border-dark-border light:border-slate-200 hover:text-white flex items-center gap-1">
-                                <span class="material-symbols-outlined text-xs">pause</span> Pause
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Chart Canvas -->
-                    <div class="h-80 w-full">
-                        <canvas id="full-latency-chart" class="w-full h-full"></canvas>
-                    </div>
+                <div class="flex-1 overflow-x-auto overflow-y-auto terminal-scroll bg-surface-container-lowest">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-10">
+                            <tr class="border-b border-outline-variant bg-surface-container-low font-semibold text-on-surface-variant">
+                                <th class="p-sm">Status</th>
+                                <th class="p-sm">SLA Violations</th>
+                                <th class="p-sm">Cost (₹/hr)</th>
+                                <th class="p-sm">Power (W)</th>
+                                <th class="p-sm">Migration</th>
+                                <th class="p-sm">Placement Mapping</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pareto-table-body" class="divide-y divide-outline-variant/40">
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-on-surface-variant">
+                                    Awaiting Pareto front evaluation...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </section>
 
-                <!-- Workload SLA Health Metrics Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5" id="analytics-workload-breakdown">
-                    <!-- Populated by JS -->
-                </div>
-
-            </div>
-        </div>
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 4: DECISION & MIGRATION TERMINAL AUDITOR                         -->
-        <!-- ===================================================================== -->
-        <div id="view-logs" class="tab-view">
-            <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 flex flex-col shadow-md overflow-hidden">
-                
-                <!-- Terminal Toolbar -->
-                <div class="p-3 bg-[#0a0b0d]/90 light:bg-slate-100 border-b border-dark-border light:border-slate-200 flex flex-wrap justify-between items-center gap-3">
-                    <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-amber-400 text-lg">terminal</span>
-                        <h2 class="text-xs font-bold uppercase tracking-wider text-white light:text-slate-900">Orchestrator Decision &amp; Migration Audit Log</h2>
-                        <span id="log-count-indicator" class="mono text-[11px] text-slate-400 ml-1">0 events</span>
-                    </div>
-
-                    <!-- Search & Filters -->
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <div class="relative">
-                            <input type="text" id="log-filter-input" onkeyup="filterLogsView()" placeholder="Filter logs (e.g. MIGRATE, checkout)..." class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-200 light:text-slate-800 placeholder-slate-500 focus:outline-none focus:border-brand-500 w-44 md:w-60"/>
-                        </div>
-
-                        <select id="log-category-select" onchange="filterLogsView()" class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-200 light:text-slate-800 focus:outline-none focus:border-brand-500">
-                            <option value="all">All Events</option>
-                            <option value="migrate">Migrations Only</option>
-                            <option value="trigger">SLA Triggers</option>
-                            <option value="policy">Policy Changes</option>
-                            <option value="chaos">Chaos Injections</option>
-                        </select>
-
-                        <button onclick="toggleLogAutoScroll()" id="btn-log-autoscroll" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white text-slate-300 light:text-slate-700 border border-dark-border light:border-slate-300 flex items-center gap-1">
-                            <span class="material-symbols-outlined text-xs">vertical_align_bottom</span> Auto-scroll: ON
-                        </button>
-
-                        <button onclick="copyLogsToClipboard()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white text-slate-300 light:text-slate-700 border border-dark-border light:border-slate-300 hover:text-white flex items-center gap-1" title="Copy logs">
-                            <span class="material-symbols-outlined text-xs">content_copy</span> Copy
-                        </button>
-
-                        <button onclick="downloadLogsTxt()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white flex items-center gap-1">
-                            <span class="material-symbols-outlined text-xs">download</span> Export
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Terminal Output Window -->
-                <div class="p-4 bg-[#080d19] text-xs mono leading-relaxed text-slate-300 overflow-y-auto max-h-[580px] custom-scroll flex flex-col gap-1" id="full-terminal-output">
-                    <div class="text-slate-500">&gt; Connected to state.py decision seam.</div>
-                    <div class="text-slate-500">&gt; Awaiting controller loop optimization cycles...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 5: CHAOS & SIMULATOR BENCH                                      -->
-        <!-- ===================================================================== -->
-        <div id="view-chaos" class="tab-view">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                
-                <!-- Left: Interactive Chaos Controls -->
-                <div class="lg:col-span-7 flex flex-col gap-4">
-                    
-                    <!-- Quick Drill Scenarios -->
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                        <div class="flex items-center gap-2 pb-2 border-b border-dark-border light:border-slate-200">
-                            <span class="material-symbols-outlined text-amber-400 text-lg">bolt</span>
-                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-white light:text-slate-900">Chaos Injection &amp; Stress Test Bench</h3>
-                        </div>
-                        <p class="text-xs text-slate-400">Trigger simulated traffic surges, node outages, or workload SLA constraints to observe how the optimizer reacts in real-time.</p>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                            <button onclick="injectChaosSurge('checkout', 750)" class="p-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl flex flex-col text-left transition-all group">
-                                <span class="text-xs font-bold text-amber-400 flex items-center justify-between">
-                                    Checkout Surge <span class="material-symbols-outlined text-sm">trending_up</span>
-                                </span>
-                                <span class="text-[11px] text-slate-400 mt-1">Spike checkout to 750 req/s, saturating edge-1 and triggering eviction.</span>
-                            </button>
-
-                            <button onclick="injectChaosSurge('recommend', 450)" class="p-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-xl flex flex-col text-left transition-all group">
-                                <span class="text-xs font-bold text-blue-400 flex items-center justify-between">
-                                    Recommend Surge <span class="material-symbols-outlined text-sm">trending_up</span>
-                                </span>
-                                <span class="text-[11px] text-slate-400 mt-1">Spike recommend to 450 req/s across edge-2 and core.</span>
-                            </button>
-
-                            <button onclick="resetChaosSimulation()" class="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex flex-col text-left transition-all group">
-                                <span class="text-xs font-bold text-emerald-400 flex items-center justify-between">
-                                    Restore Nominal <span class="material-symbols-outlined text-sm">restart_alt</span>
-                                </span>
-                                <span class="text-[11px] text-slate-400 mt-1">Clear all overrides and restore automatic 60-second telemetry cycle.</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Workload Demand & SLA Sliders -->
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                        <div class="flex items-center gap-2 pb-2 border-b border-dark-border light:border-slate-200">
-                            <span class="material-symbols-outlined text-brand-400 text-lg">tune</span>
-                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-white light:text-slate-900">Workload Parameter Sliders</h3>
-                        </div>
-
-                        <div class="flex flex-col gap-4" id="chaos-workload-sliders">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- Right: Node Failure Chaos & Policy Sandbox -->
-                <div class="lg:col-span-5 flex flex-col gap-4">
-                    
-                    <!-- Node Hardware Outage Simulator -->
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                        <div class="flex items-center gap-2 pb-2 border-b border-dark-border light:border-slate-200">
-                            <span class="material-symbols-outlined text-red-400 text-lg">electrical_services</span>
-                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-white light:text-slate-900">Node Failover &amp; Chaos Toggles</h3>
-                        </div>
-                        <p class="text-xs text-slate-400">Simulate taking a node offline (hardware crash, power loss) to test dynamic workload re-routing.</p>
-
-                        <div class="flex flex-col gap-2 pt-1" id="chaos-nodes-list">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- ===================================================================== -->
-        <!-- VIEW 6: CLUSTER SPECS & HARDWARE PROFILES                            -->
-        <!-- ===================================================================== -->
-        <div id="view-config" class="tab-view">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                
-                <!-- Hardware Specs -->
-                <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                    <div class="flex items-center gap-2 pb-2 border-b border-dark-border light:border-slate-200">
-                        <span class="material-symbols-outlined text-brand-400 text-lg">memory</span>
-                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-white light:text-slate-900">Physical Hardware Topology &amp; Profiles</h3>
-                    </div>
-                    <div class="flex flex-col gap-2.5" id="specs-nodes-container">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Workload Taxonomy & Constraints -->
-                <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col gap-3">
-                    <div class="flex items-center gap-2 pb-2 border-b border-dark-border light:border-slate-200">
-                        <span class="material-symbols-outlined text-emerald-400 text-lg">category</span>
-                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-white light:text-slate-900">Workload Classification &amp; Tier Rules</h3>
-                    </div>
-                    <div class="flex flex-col gap-2.5" id="specs-workloads-container">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-            </div>
         </div>
 
     </main>
+</div>
 
-    <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
-
-    <!-- ========================================================================= -->
-    <!-- JAVASCRIPT ENGINE & REAL-TIME CONTROLLER LOGIC                           -->
-    <!-- ========================================================================= -->
-    <script>
-        // Global Application State
-        let currentTabId = 'cockpit';
-        let latestState = null;
-        let prevPlacementMap = {};
-        let rawEventsList = [];
-        let isLogAutoScroll = true;
-        let isChartPaused = false;
-        let chartWindowSec = 60;
-        let fullLatencyChart = null;
-        let miniLatencyChart = null;
-        let isSurgeActive = false;
-
-        const WORKLOAD_COLORS = {
-            'checkout': '#3b82f6',
-            'recommend': '#10b981',
-            'analytics': '#f59e0b',
-            'default': '#8b5cf6'
-        };
-
-        function getWorkloadColor(name) {
-            return WORKLOAD_COLORS[name] || WORKLOAD_COLORS.default;
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"']/g, function (m) {
-                return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m];
-            });
-        }
-
-        // Toast Notification Helper
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            const bgClass = type === 'success' ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700/50'
-                          : type === 'warning' ? 'bg-amber-950/90 text-amber-300 border-amber-700/50'
-                          : type === 'error'   ? 'bg-red-950/90 text-red-300 border-red-700/50'
-                          : 'bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]/90 text-slate-200 border-dark-border';
-
-            toast.className = `toast-enter pointer-events-auto flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-semibold shadow-xl backdrop-blur ${bgClass}`;
-            toast.innerHTML = `
-                <span class="material-symbols-outlined text-base">${type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info'}</span>
-                <span>${escapeHtml(message)}</span>
-            `;
-
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(10px)';
-                toast.style.transition = 'all 0.25s ease-out';
-                setTimeout(() => toast.remove(), 250);
-            }, 3500);
-        }
-
-        // Theme Toggle (Dark / Light)
-        function toggleTheme() {
-            const html = document.documentElement;
-            const icon = document.getElementById('theme-icon');
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                html.classList.add('light');
-                if (icon) icon.innerText = 'dark_mode';
-                localStorage.setItem('theme', 'light');
+<script>
+    // Tab Switching
+    function switchTab(tabId) {
+        // Update tab buttons
+        const tabs = ['topology', 'telemetry', 'log', 'pareto'];
+        tabs.forEach(t => {
+            const btn = document.getElementById('tab-' + t);
+            if (!btn) return;
+            if (t === tabId) {
+                btn.className = "flex items-center gap-md px-md py-sm rounded-lg text-primary bg-secondary-container/30 font-bold border-r-4 border-primary transition-all w-full text-left";
+                const icon = btn.querySelector('span:first-child');
+                if (icon) icon.style.fontVariationSettings = "'FILL' 1";
             } else {
-                html.classList.remove('light');
-                html.classList.add('dark');
-                if (icon) icon.innerText = 'light_mode';
-                localStorage.setItem('theme', 'dark');
+                btn.className = "flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors border-r-4 border-transparent w-full text-left";
+                const icon = btn.querySelector('span:first-child');
+                if (icon) icon.style.fontVariationSettings = "normal";
             }
-            updateChartTheme();
+        });
+
+        // Update tab contents
+        document.querySelectorAll('.tab-content').forEach(el => {
+            el.classList.add('hidden');
+        });
+        const activeSection = document.getElementById(tabId + '-section');
+        if (activeSection) {
+            activeSection.classList.remove('hidden');
+        }
+    }
+
+    // State Tracking
+    let prevPlacements = {};
+    let lastRenderedEventsCount = 0;
+
+    // Clock
+    function updateClock() {
+        const now = new Date();
+        const el = document.getElementById('live-clock');
+        if (el) el.innerText = now.toISOString().substring(11, 19) + ' UTC';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Helper: Escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function (m) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m];
+        });
+    }
+
+    async function setPolicy(policyName) {
+      try {
+        const res = await fetch('/api/policy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ policy: policyName })
+        });
+        if (!res.ok) throw new Error('Failed to update policy');
+      } catch (e) {
+        console.error(e);
+        alert("Failed to update policy");
+      }
+    }
+
+    // 1. Update Connection & Header KPIs
+    function updateHeaderAndKPIs(data) {
+        const statusBadge = document.getElementById('status-badge');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const snapAge = document.getElementById('snapshot-age');
+        const subStatus = document.getElementById('sidebar-status-sub');
+
+        if (data.connected) {
+            statusBadge.className = "flex items-center gap-xs bg-green-100 px-sm py-[3px] rounded-full border border-green-400/40";
+            statusDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse";
+            statusText.className = "text-[10px] font-bold text-green-800 uppercase tracking-wider";
+            statusText.innerText = "Live · state.py";
+            if (subStatus) subStatus.innerText = "State Engine Live";
+        } else if (data.waiting) {
+            statusBadge.className = "flex items-center gap-xs bg-amber-100 px-sm py-[3px] rounded-full border border-amber-400/40";
+            statusDot.className = "w-2 h-2 rounded-full bg-amber-500";
+            statusText.className = "text-[10px] font-bold text-amber-800 uppercase tracking-wider";
+            statusText.innerText = "Waiting for Controller";
+            if (subStatus) subStatus.innerText = "Waiting for Cycle";
+        } else {
+            statusBadge.className = "flex items-center gap-xs bg-red-100 px-sm py-[3px] rounded-full border border-red-400/40";
+            statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+            statusText.className = "text-[10px] font-bold text-red-800 uppercase tracking-wider";
+            statusText.innerText = `Stale (${data.age_s || '?'}s)`;
+            if (subStatus) subStatus.innerText = "Disconnected";
         }
 
-        // Initialize Theme from localStorage
-        (function initTheme() {
-            const saved = localStorage.getItem('theme');
-            const icon = document.getElementById('theme-icon');
-            if (saved === 'light') {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.classList.add('light');
-                if (icon) icon.innerText = 'dark_mode';
-            }
-        })();
+        if (snapAge) snapAge.innerText = (data.age_s !== undefined ? data.age_s + 's' : '0.0s');
 
-        // Tab Switching
-        function switchTab(tabId) {
-            currentTabId = tabId;
+        // Totals
+        const t = data.totals || {};
+        const costEl = document.getElementById('kpi-cost');
+        if (costEl) costEl.innerText = '₹' + (t.cost_per_hr !== undefined ? t.cost_per_hr : 0);
 
-            // 1. Panes
-            document.querySelectorAll('.tab-view').forEach(view => {
-                view.classList.remove('active');
-            });
-            const targetView = document.getElementById('view-' + tabId);
-            if (targetView) targetView.classList.add('active');
+        const powEl = document.getElementById('kpi-power');
+        if (powEl) powEl.innerText = Math.round(t.power_w || 0) + ' W';
 
-            // 2. Navigation Pills
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.className = "nav-btn flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900";
-            });
-            const activeBtn = document.getElementById('nav-' + tabId);
-            if (activeBtn) {
-                activeBtn.className = "nav-btn active flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-sm";
-            }
-
-            // Resize charts if switching to analytics
-            if (tabId === 'analytics' && fullLatencyChart) {
-                setTimeout(() => fullLatencyChart.resize(), 50);
-            }
-            if (tabId === 'cockpit' && miniLatencyChart) {
-                setTimeout(() => miniLatencyChart.resize(), 50);
-            }
+        const violEl = document.getElementById('kpi-violations');
+        if (violEl) {
+            const v = t.sla_violations || 0;
+            violEl.innerText = v;
+            violEl.className = v > 0 ? "text-xl lg:text-2xl font-bold text-red-600 animate-pulse" : "text-xl lg:text-2xl font-bold text-green-600";
         }
 
-        // UTC Clock
-        function updateClockTicker() {
-            const now = new Date();
-            const el = document.getElementById('clock-ticker');
-            if (el) {
-                el.innerHTML = `<span class="material-symbols-outlined text-xs text-slate-400">schedule</span> ${now.toISOString().substring(11, 19)} UTC`;
-            }
-        }
-        setInterval(updateClockTicker, 1000);
-        updateClockTicker();
+        const nodesEl = document.getElementById('kpi-nodes');
+      if (nodesEl) nodesEl.innerText = `${t.nodes_ready || 0}/${t.nodes_total || 0}`;
 
-        // ---------------------------------------------------------------------
-        // Chart.js Setup
-        // ---------------------------------------------------------------------
-        function initCharts() {
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? '#1f2d48' : '#e2e8f0';
-            const tickColor = isDark ? '#94a3b8' : '#64748b';
+      const polEl = document.getElementById('kpi-policy');
+      const subEl = document.getElementById('kpi-policy-sub');
+      if (polEl && document.activeElement !== polEl) {
+        polEl.value = data.policy_mode || data.policy || 'sla-first';
+      }
+      if (subEl) {
+          if (data.policy_mode === 'auto') {
+              subEl.innerHTML = `auto &rarr; <span class="font-bold text-primary">${escapeHtml(data.policy)}</span>`;
+          } else {
+              subEl.innerText = "Multi-objective selector";
+          }
+      }
+    }
 
-            // 1. Full Latency Chart
-            const fullCtx = document.getElementById('full-latency-chart');
-            if (fullCtx) {
-                fullLatencyChart = new Chart(fullCtx, {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: {
-                        animation: false,
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        parsing: false,
-                        interaction: { intersect: false, mode: 'nearest' },
-                        scales: {
-                            x: {
-                                type: 'linear',
-                                ticks: { color: tickColor, callback: v => v + 's' },
-                                grid: { color: gridColor },
-                                title: { display: true, text: 'Time relative to current (seconds)', color: tickColor, font: { size: 10, weight: 'bold' } }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                ticks: { color: tickColor },
-                                grid: { color: gridColor },
-                                title: { display: true, text: 'p99 Latency (ms)', color: tickColor, font: { size: 10, weight: 'bold' } }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: {
-                                    color: tickColor,
-                                    boxWidth: 12,
-                                    font: { size: 11, weight: 'bold' }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+    // 2. Render Topology Grid
+    function renderTopology(data) {
+        const grid = document.getElementById('topology-grid');
+        const countHeader = document.getElementById('topology-count');
+        const nodes = data.nodes || {};
+        const workloads = data.workloads || {};
 
-            // 2. Mini Latency Chart in Cockpit
-            const miniCtx = document.getElementById('mini-latency-chart');
-            if (miniCtx) {
-                miniLatencyChart = new Chart(miniCtx, {
-                    type: 'line',
-                    data: { datasets: [] },
-                    options: {
-                        animation: false,
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        parsing: false,
-                        scales: {
-                            x: { display: false, type: 'linear' },
-                            y: { beginAtZero: true, ticks: { color: tickColor, font: { size: 9 } }, grid: { color: gridColor } }
-                        },
-                        plugins: {
-                            legend: { display: false }
-                        }
-                    }
-                });
-            }
+        const nodeNames = Object.keys(nodes);
+        if (countHeader) countHeader.innerText = `${nodeNames.length} Active Nodes`;
+
+        if (!nodeNames.length) {
+            grid.innerHTML = '<div class="col-span-full py-10 text-center text-on-surface-variant text-xs">No active nodes in snapshot</div>';
+            return;
         }
 
-        function updateChartTheme() {
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? '#1f2d48' : '#e2e8f0';
-            const tickColor = isDark ? '#94a3b8' : '#64748b';
+        // Group workloads by node
+        const byNode = {};
+        Object.entries(workloads).forEach(([wName, wData]) => {
+            const targetNode = wData.node;
+            if (!byNode[targetNode]) byNode[targetNode] = [];
+            byNode[targetNode].push({ name: wName, ...wData });
+        });
 
-            [fullLatencyChart, miniLatencyChart].forEach(chart => {
-                if (!chart) return;
-                if (chart.options.scales.x && chart.options.scales.x.grid) chart.options.scales.x.grid.color = gridColor;
-                if (chart.options.scales.x && chart.options.scales.x.ticks) chart.options.scales.x.ticks.color = tickColor;
-                if (chart.options.scales.y && chart.options.scales.y.grid) chart.options.scales.y.grid.color = gridColor;
-                if (chart.options.scales.y && chart.options.scales.y.ticks) chart.options.scales.y.ticks.color = tickColor;
-                chart.update();
-            });
-        }
+        let html = '';
+        nodeNames.forEach(nodeName => {
+            const n = nodes[nodeName];
+            const isEdge = (n.tier || '').toLowerCase() === 'edge';
+            const tierBadge = isEdge 
+                ? '<span class="text-[10px] font-bold bg-[#bdcefe] text-[#001552] px-2 py-0.5 rounded border border-[#8697C4]/30 uppercase">Edge</span>'
+                : '<span class="text-[10px] font-bold bg-[#3d52a0] text-white px-2 py-0.5 rounded border border-[#233a87]/30 uppercase">Core</span>';
+            
+            const nodeIcon = isEdge ? 'router' : 'laptop_mac';
+            const cpuPct = Math.round((n.cpu_util || 0) * 100);
+            const memPct = Math.round((n.mem_util || 0) * 100);
+            const cpuBarColor = cpuPct > 80 ? 'bg-red-600' : (cpuPct > 50 ? 'bg-amber-500' : 'bg-[#3d52a0]');
+            const memBarColor = memPct > 80 ? 'bg-red-600' : 'bg-[#7091E6]';
 
-        function setChartWindow(sec) {
-            chartWindowSec = sec;
-            [30, 60, 120].forEach(s => {
-                const btn = document.getElementById('btn-win-' + s);
-                if (btn) {
-                    btn.className = s === sec 
-                        ? 'px-2 py-0.5 rounded bg-brand-600 text-white font-bold'
-                        : 'px-2 py-0.5 rounded text-slate-400 font-semibold';
-                }
-            });
-            if (latestState) {
-                renderCharts(latestState.history, latestState.workloads);
-            }
-        }
-
-        function toggleChartPause() {
-            isChartPaused = !isChartPaused;
-            const btn = document.getElementById('btn-chart-pause');
-            if (btn) {
-                btn.innerHTML = isChartPaused 
-                    ? `<span class="material-symbols-outlined text-xs text-amber-400">play_arrow</span> Resume`
-                    : `<span class="material-symbols-outlined text-xs">pause</span> Pause`;
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // Interactive API Actions (Policy, Chaos, Node toggles)
-        // ---------------------------------------------------------------------
-        async function onPolicyChange(newPolicy) {
-            try {
-                const res = await fetch('/api/policy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ policy: newPolicy })
-                });
-                const json = await res.json();
-                if (json.ok) {
-                    showToast(`Active policy switched to '${newPolicy}'`, 'success');
-                    const sel = document.getElementById('policy-select');
-                    if (sel) sel.value = newPolicy;
-                    pollState();
-                } else {
-                    showToast(`Policy change failed: ${json.error}`, 'error');
-                }
-            } catch (err) {
-                console.error(err);
-                showToast(`Failed to switch policy: ${err.message}`, 'error');
-            }
-        }
-
-        async function quickSurgeToggle() {
-            isSurgeActive = !isSurgeActive;
-            const btnText = document.getElementById('quick-surge-text');
-            if (isSurgeActive) {
-                await injectChaosSurge('checkout', 750);
-                if (btnText) btnText.innerText = 'Reset Load';
+            const assignedWorkloads = byNode[nodeName] || [];
+            
+            let pillsHtml = '';
+            if (assignedWorkloads.length === 0) {
+                pillsHtml = '<span class="text-[10px] text-on-surface-variant italic">No workloads currently placed</span>';
             } else {
-                await resetChaosSimulation();
-                if (btnText) btnText.innerText = 'Spike Traffic';
-            }
-        }
+                pillsHtml = assignedWorkloads.map(w => {
+                    const isBreach = w.p99_ms > w.sla_ms;
+                    const prev = prevPlacements[w.name];
+                    const justMigrated = prev && prev !== nodeName;
+                    const animClass = justMigrated ? 'animate-migrate' : '';
 
-        async function injectChaosSurge(workload, rps) {
-            try {
-                const res = await fetch('/api/simulate/spike', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workload, rps })
-                });
-                const json = await res.json();
-                if (json.ok) {
-                    showToast(`Injected traffic surge on ${workload} (${rps} req/s)`, 'warning');
-                    pollState();
-                }
-            } catch (err) {
-                showToast(`Chaos injection error: ${err.message}`, 'error');
-            }
-        }
+                    const badgeStyle = isBreach
+                        ? 'bg-red-100 text-red-800 border-red-400 font-bold'
+                        : 'bg-[#7091E6]/20 text-[#233a87] border-[#7091E6]/40 font-medium';
 
-        async function toggleNodeStatus(nodeName) {
-            try {
-                const res = await fetch('/api/simulate/node', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ node: nodeName })
-                });
-                const json = await res.json();
-                if (json.ok) {
-                    const statusText = json.ready ? 'ONLINE (Healthy)' : 'OFFLINE (Failed)';
-                    showToast(`Node ${nodeName} status toggled to ${statusText}`, json.ready ? 'success' : 'error');
-                    pollState();
-                }
-            } catch (err) {
-                showToast(`Failed to toggle node: ${err.message}`, 'error');
-            }
-        }
-
-        async function resetChaosSimulation() {
-            try {
-                const res = await fetch('/api/simulate/reset', { method: 'POST' });
-                const json = await res.json();
-                if (json.ok) {
-                    isSurgeActive = false;
-                    const btnText = document.getElementById('quick-surge-text');
-                    if (btnText) btnText.innerText = 'Spike Traffic';
-                    showToast('Simulation restored to nominal cycle', 'success');
-                    pollState();
-                }
-            } catch (err) {
-                showToast(`Reset failed: ${err.message}`, 'error');
-            }
-        }
-
-        async function applyCandidatePlacement(placementJsonStr) {
-            try {
-                const placement = JSON.parse(placementJsonStr);
-                const res = await fetch('/api/placement/apply', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ placement })
-                });
-                const json = await res.json();
-                if (json.ok) {
-                    showToast('Manual placement candidate applied', 'success');
-                    pollState();
-                }
-            } catch (err) {
-                showToast(`Failed to apply placement: ${err.message}`, 'error');
-            }
-        }
-
-        async function updateWorkloadSlider(workload, rps, sla_ms) {
-            try {
-                const body = { workload };
-                if (rps !== undefined) body.rps = rps;
-                if (sla_ms !== undefined) body.sla_ms = sla_ms;
-
-                await fetch('/api/workload/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                pollState();
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // Render Functions
-        // ---------------------------------------------------------------------
-
-        // 1. Ribbon & Header KPIs
-        function renderHeaderAndRibbon(data) {
-            const seamPill = document.getElementById('seam-pill');
-            const seamDot = document.getElementById('seam-dot');
-            const seamText = document.getElementById('seam-text');
-            const seamAge = document.getElementById('seam-age');
-            const policySelect = document.getElementById('policy-select');
-            const policyBadge = document.getElementById('kpi-policy-badge');
-
-            const isConn = data.connected;
-            const isWait = data.waiting;
-
-            if (isConn) {
-                seamPill.className = "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 light:bg-emerald-50 text-emerald-400 light:text-emerald-700 border border-emerald-800/40";
-                seamDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-                seamText.innerText = "LIVE · state.py";
-            } else if (isWait) {
-                seamPill.className = "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-950/80 light:bg-amber-50 text-amber-400 light:text-amber-700 border border-amber-800/40";
-                seamDot.className = "w-2 h-2 rounded-full bg-amber-500";
-                seamText.innerText = "WAITING";
-            } else {
-                seamPill.className = "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-950/80 light:bg-red-50 text-red-400 light:text-red-700 border border-red-800/40";
-                seamDot.className = "w-2 h-2 rounded-full bg-red-500";
-                seamText.innerText = `STALE (${data.age_s || '?'}s)`;
+                    return `
+                        <span class="text-[11px] px-2 py-1 rounded border flex items-center gap-1 ${badgeStyle} ${animClass} transition-all shadow-xs" title="SLA: ${w.sla_ms}ms · Class: ${w.class || 'standard'}">
+                            <span class="material-symbols-outlined text-[13px]">${isBreach ? 'error' : 'task_alt'}</span>
+                            <span class="font-semibold">${escapeHtml(w.name)}</span>
+                            <span class="opacity-80">· ${w.p99_ms}ms</span>
+                        </span>
+                    `;
+                }).join('');
             }
 
-            if (seamAge) seamAge.innerText = `(${data.age_s !== undefined ? data.age_s + 's' : '0.0s'})`;
-
-            if (policySelect && data.policy && policySelect.value !== data.policy) {
-                policySelect.value = data.policy;
-            }
-            if (policyBadge) policyBadge.innerText = data.policy || 'sla-first';
-
-            // Totals Ribbon
-            const t = data.totals || {};
-            const costEl = document.getElementById('kpi-cost');
-            if (costEl) costEl.innerText = `₹${t.cost_per_hr !== undefined ? t.cost_per_hr.toFixed(2) : '0.00'}/hr`;
-
-            const powEl = document.getElementById('kpi-power');
-            if (powEl) powEl.innerText = `${Math.round(t.power_w || 0)} W`;
-
-            const violEl = document.getElementById('kpi-violations');
-            if (violEl) {
-                const v = t.sla_violations || 0;
-                violEl.innerText = `${v} ${v === 1 ? 'Breach' : 'Breaches'}`;
-                violEl.className = v > 0 
-                    ? "mono font-bold px-2 py-0.5 rounded text-xs bg-red-950 text-red-400 border border-red-800/50 animate-pulse"
-                    : "mono font-bold px-2 py-0.5 rounded text-xs bg-emerald-950 text-emerald-400 border border-emerald-800/40";
-            }
-
-            const nodesEl = document.getElementById('kpi-nodes');
-            if (nodesEl) nodesEl.innerText = `${t.nodes_ready || 0}/${t.nodes_total || 0} Ready`;
-
-            // Cycle progress
-            const sim = data.simulation || {};
-            const phase = sim.cycle_phase || 0;
-            const bar = document.getElementById('cycle-progress-bar');
-            const lbl = document.getElementById('cycle-phase-label');
-            if (bar) bar.style.width = `${Math.min((phase / 60) * 100, 100)}%`;
-            if (lbl) lbl.innerText = `${Math.round(phase)}s/60s`;
-        }
-
-        // 2. Cockpit Topology & Node Cards
-        function renderCockpitNodes(data) {
-            const container = document.getElementById('cockpit-nodes-container');
-            const countBadge = document.getElementById('node-count-badge');
-            const nodes = data.nodes || {};
-            const workloads = data.workloads || {};
-
-            const nodeKeys = Object.keys(nodes);
-            if (countBadge) countBadge.innerText = `${nodeKeys.length} Nodes`;
-
-            if (!nodeKeys.length) {
-                container.innerHTML = '<div class="col-span-2 py-8 text-center text-slate-400 text-xs">No nodes discovered</div>';
-                return;
-            }
-
-            // Map workloads to nodes
-            const nodeWorkloads = {};
-            Object.entries(workloads).forEach(([wName, wMeta]) => {
-                const n = wMeta.node;
-                if (!nodeWorkloads[n]) nodeWorkloads[n] = [];
-                nodeWorkloads[n].push({ name: wName, ...wMeta });
-            });
-
-            let html = '';
-            nodeKeys.forEach(name => {
-                const n = nodes[name];
-                const isEdge = (n.tier || '').toLowerCase() === 'edge';
-                const cpuPct = Math.round((n.cpu_util || 0) * 100);
-                const memPct = Math.round((n.mem_util || 0) * 100);
-
-                const tierBadge = isEdge
-                    ? '<span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-700/40 uppercase">EDGE</span>'
-                    : '<span class="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 uppercase">CORE</span>';
-
-                const readyBadge = n.ready
-                    ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" title="Ready"></span>'
-                    : '<span class="w-2 h-2 rounded-full bg-red-500" title="Offline"></span>';
-
-                const assigned = nodeWorkloads[name] || [];
-                let placedChips = '';
-                if (assigned.length === 0) {
-                    placedChips = '<span class="text-[10px] text-slate-500 italic">No workloads assigned</span>';
-                } else {
-                    placedChips = assigned.map(w => {
-                        const isBreach = w.p99_ms > w.sla_ms;
-                        const prev = prevPlacementMap[w.name];
-                        const justMigrated = prev && prev !== name;
-                        const anim = justMigrated ? 'animate-migrate' : '';
-
-                        const chipColor = isBreach
-                            ? 'bg-red-950/80 text-red-300 border-red-700/60'
-                            : 'bg-brand-950/70 text-brand-300 border-brand-800/50';
-
-                        return `
-                            <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${chipColor} ${anim} transition-all shadow-xs" title="SLA: ${w.sla_ms}ms · Class: ${w.class}">
-                                <span class="material-symbols-outlined text-[11px]">${isBreach ? 'error' : 'check_circle'}</span>
-                                <span>${escapeHtml(w.name)}</span>
-                                <span class="mono opacity-80">${w.p99_ms}ms</span>
-                            </span>
-                        `;
-                    }).join('');
-                }
-
-                const cpuBarColor = cpuPct > 80 ? 'bg-red-500' : (cpuPct > 55 ? 'bg-amber-500' : 'bg-brand-500');
-
-                html += `
-                    <div class="bg-dark-card light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-3 flex flex-col justify-between hover:border-brand-500/50 transition-all shadow-sm ${n.ready ? '' : 'opacity-50 border-red-900/50'}">
-                        
-                        <!-- Top Header -->
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center gap-2">
-                                ${readyBadge}
-                                <div>
-                                    <div class="flex items-center gap-1.5">
-                                        <h3 class="font-extrabold text-xs text-white light:text-slate-900 tracking-tight">${escapeHtml(name)}</h3>
-                                        ${n.raw_hostname ? `<span class="text-[10px] text-slate-400 font-medium">(${escapeHtml(n.raw_hostname)})</span>` : ''}
-                                        ${tierBadge}
-                                    </div>
-                                    <span class="text-[10px] text-slate-400 mono">${escapeHtml(n.zone || n.tier)}</span>
-                                </div>
-                            </div>
-
-                            <button onclick="toggleNodeStatus('${escapeHtml(name)}')" class="text-[10px] font-bold px-2 py-0.5 rounded ${n.ready ? 'bg-red-950/60 hover:bg-red-900/80 text-red-400 border border-red-800/40' : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-800/40'} transition-all" title="Toggle node fail / recover">
-                                ${n.ready ? 'Fail Node' : 'Recover'}
-                            </button>
-                        </div>
-
-                        <!-- Specs Row -->
-                        <div class="grid grid-cols-4 gap-1 p-1 bg-[#0a0b0d] light:bg-slate-100 rounded-lg border border-dark-border light:border-slate-200 mb-2.5 text-[9px] mono text-slate-400">
-                            <div><span>Cores:</span> <b class="text-slate-200 light:text-slate-800">${n.cpu_cores}</b></div>
-                            <div><span>Lat:</span> <b class="text-brand-400">${n.base_latency_ms}ms</b></div>
-                            <div><span>Cost:</span> <b class="text-slate-200 light:text-slate-800">₹${n.cost_per_hr}/h</b></div>
-                            <div><span>Pwr:</span> <b class="text-amber-400">${Math.round(n.power_w)}W</b></div>
-                        </div>
-
-                        <!-- Meter Bars -->
-                        <div class="flex flex-col gap-1.5 mb-2.5">
+            html += `
+                <div class="card-border rounded-lg p-sm lg:p-md bg-surface-container flex flex-col relative group hover:border-[#7091E6] transition-all shadow-xs ${n.ready ? '' : 'opacity-50'}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-sm text-primary">
+                            <span class="material-symbols-outlined text-xl">${nodeIcon}</span>
                             <div>
-                                <div class="flex justify-between text-[10px] mb-0.5 text-slate-400 mono">
-                                    <span>CPU Utilization</span>
-                                    <span class="font-bold text-slate-200 light:text-slate-800">${cpuPct}%</span>
-                                </div>
-                                <div class="w-full h-1.5 bg-[#0a0b0d] light:bg-slate-200 rounded-full overflow-hidden">
-                                    <div class="h-full ${cpuBarColor} transition-all duration-300 rounded-full" style="width: ${Math.min(cpuPct, 100)}%"></div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between text-[10px] mb-0.5 text-slate-400 mono">
-                                    <span>Memory Allocation</span>
-                                    <span class="font-bold text-slate-200 light:text-slate-800">${memPct}%</span>
-                                </div>
-                                <div class="w-full h-1 bg-[#0a0b0d] light:bg-slate-200 rounded-full overflow-hidden">
-                                    <div class="h-full bg-brand-400 transition-all duration-300 rounded-full" style="width: ${Math.min(memPct, 100)}%"></div>
-                                </div>
+                                <h3 class="font-bold text-sm text-primary">${escapeHtml(nodeName)}</h3>
+                                <span class="text-[10px] text-on-surface-variant font-mono">${escapeHtml(n.zone || n.tier)}</span>
                             </div>
                         </div>
-
-                        <!-- Workload Chips -->
-                        <div class="pt-2 border-t border-dark-border light:border-slate-200">
-                            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Placed Workloads</div>
-                            <div class="flex flex-wrap gap-1">
-                                ${placedChips}
-                            </div>
+                        <div class="flex items-center gap-1">
+                            ${n.ready ? '' : '<span class="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">DOWN</span>'}
+                            ${tierBadge}
                         </div>
-
                     </div>
-                `;
-            });
 
-            container.innerHTML = html;
-        }
-
-        // 3. Cockpit Workload SLA Cards
-        function renderCockpitWorkloads(data) {
-            const container = document.getElementById('cockpit-workloads-container');
-            const workloads = data.workloads || {};
-            const entries = Object.entries(workloads);
-
-            if (!entries.length) {
-                container.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">No active workloads</div>';
-                return;
-            }
-
-            let html = '';
-            entries.forEach(([name, w]) => {
-                const isBreach = w.p99_ms > w.sla_ms;
-                const ratio = Math.round((w.p99_ms / w.sla_ms) * 100);
-                const barColor = isBreach ? 'bg-red-500' : (ratio > 75 ? 'bg-amber-500' : 'bg-emerald-500');
-
-                const statusBadge = isBreach
-                    ? '<span class="text-[9px] font-black px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-700/50 animate-pulse">SLA BREACH</span>'
-                    : '<span class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/40">SLA HEALTHY</span>';
-
-                html += `
-                    <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border ${isBreach ? 'border-red-600/60 bg-red-950/15' : 'border-dark-border light:border-slate-200'} p-3 shadow-sm flex flex-col gap-2">
-                        
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center gap-1.5">
-                                <span class="font-black text-xs text-white light:text-slate-900">${escapeHtml(name)}</span>
-                                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#0a0b0d] light:bg-slate-100 text-slate-400 mono">${escapeHtml(w.class || 'standard')}</span>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                ${statusBadge}
-                                <span class="mono text-[10px] font-bold px-2 py-0.5 rounded bg-brand-950/80 text-brand-300 border border-brand-800/40">
-                                    📍 ${escapeHtml(w.node)}
-                                </span>
-                            </div>
+                    <!-- Specs Row -->
+                    <div class="grid grid-cols-4 gap-1 p-1.5 bg-surface rounded border border-outline-variant/40 mb-3 text-[10px] text-on-surface-variant">
+                        <div class="flex flex-col">
+                            <span class="opacity-75">Cores</span>
+                            <span class="font-bold text-on-surface text-xs">${n.cpu_cores || 0}</span>
                         </div>
+                        <div class="flex flex-col">
+                            <span class="opacity-75">Base Lat</span>
+                            <span class="font-bold text-primary text-xs">${n.base_latency_ms || 0}ms</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="opacity-75">Rate</span>
+                            <span class="font-bold text-on-surface text-xs">₹${n.cost_per_hr || 0}/h</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="opacity-75">Power</span>
+                            <span class="font-bold text-amber-700 text-xs">${Math.round(n.power_w || 0)}W</span>
+                        </div>
+                    </div>
 
-                        <!-- SLA Gauge Bar -->
+                    <!-- Meters -->
+                    <div class="flex flex-col gap-1.5 mb-3">
                         <div>
-                            <div class="flex justify-between text-[10px] mono text-slate-400 mb-1">
-                                <span>Measured p99: <b class="${isBreach ? 'text-red-400 font-black' : 'text-white light:text-slate-900'}">${w.p99_ms}ms</b> / Target: ${w.sla_ms}ms</span>
-                                <span class="font-bold ${isBreach ? 'text-red-400' : 'text-slate-300 light:text-slate-700'}">${ratio}% SLA</span>
+                            <div class="flex justify-between text-[10px] mb-0.5 text-on-surface-variant">
+                                <span>CPU Utilization</span>
+                                <span class="font-semibold text-on-surface">${cpuPct}%</span>
                             </div>
-                            <div class="w-full h-2 bg-[#0a0b0d] light:bg-slate-200 rounded-full overflow-hidden">
-                                <div class="h-full ${barColor} transition-all duration-300 rounded-full" style="width: ${Math.min(ratio, 100)}%"></div>
+                            <div class="w-full h-2 bg-surface-variant rounded-full overflow-hidden">
+                                <div class="h-full ${cpuBarColor} transition-all duration-500 rounded-full" style="width: ${Math.min(cpuPct, 100)}%"></div>
                             </div>
                         </div>
-
-                        <div class="flex justify-between text-[10px] mono text-slate-400 pt-1 border-t border-dark-border light:border-slate-200">
-                            <span>Throughput: <b class="text-slate-200 light:text-slate-800">${w.rps} req/s</b></span>
-                            <span>Last Migrated: <b class="text-brand-400">${w.last_moved ? Math.round(data.timestamp - w.last_moved) + 's ago' : 'initial'}</b></span>
+                        <div>
+                            <div class="flex justify-between text-[10px] mb-0.5 text-on-surface-variant">
+                                <span>Memory Usage</span>
+                                <span class="font-semibold text-on-surface">${memPct}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
+                                <div class="h-full ${memBarColor} transition-all duration-500 rounded-full" style="width: ${Math.min(memPct, 100)}%"></div>
+                            </div>
                         </div>
-
                     </div>
-                `;
-            });
 
-            container.innerHTML = html;
+                    <!-- Placed Workloads -->
+                    <div class="mt-auto pt-2 border-t border-outline-variant/60">
+                        <div class="text-[10px] uppercase font-semibold text-on-surface-variant mb-1.5">Assigned Workloads</div>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${pillsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        grid.innerHTML = html;
+    }
+
+    // 3. Render Live Telemetry Panel
+    function renderTelemetry(data) {
+        const container = document.getElementById('telemetry-container');
+        const nodes = data.nodes || {};
+        const workloads = data.workloads || {};
+
+        let html = '';
+
+        // Section: Workload Health & Latency vs SLA
+        html += `<div class="text-[11px] font-bold uppercase tracking-wider text-primary mb-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">timer</span> Workload SLA Compliance
+                 </div>`;
+
+        Object.entries(workloads).forEach(([wName, w]) => {
+            const isBreach = w.p99_ms > w.sla_ms;
+            const slaRatio = Math.min(Math.round((w.p99_ms / w.sla_ms) * 100), 100);
+            const slaBarColor = isBreach ? 'bg-red-600' : (slaRatio > 75 ? 'bg-amber-500' : 'bg-green-600');
+            const breachPill = isBreach 
+                ? '<span class="text-[9px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded animate-pulse">BREACH</span>'
+                : '<span class="text-[9px] bg-green-100 text-green-800 font-bold px-1.5 py-0.5 rounded">OK</span>';
+
+            html += `
+                <div class="p-2 border rounded-lg bg-surface text-xs shadow-2xs ${isBreach ? 'border-red-400 bg-red-50/30' : 'border-outline-variant/60'}">
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="flex items-center gap-1">
+                            <span class="font-bold text-primary text-xs">${escapeHtml(wName)}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-surface-container font-mono text-on-surface-variant">${escapeHtml(w.class || 'standard')}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            ${breachPill}
+                            <span class="font-mono text-[10px] text-on-surface-variant font-medium">📍 ${escapeHtml(w.node)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <div class="flex-1">
+                            <div class="flex justify-between text-[10px] mb-0.5 text-on-surface-variant">
+                                <span>p99: <b class="${isBreach ? 'text-red-700 font-bold' : 'text-on-surface'}">${w.p99_ms}ms</b> / SLA: ${w.sla_ms}ms</span>
+                                <span class="font-mono">${slaRatio}% of SLA</span>
+                            </div>
+                            <div class="w-full h-2 bg-surface-variant rounded-full overflow-hidden">
+                                <div class="h-full ${slaBarColor} transition-all duration-500 rounded-full" style="width: ${slaRatio}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/30 font-mono">
+                        <span>Throughput: <b class="text-on-surface">${w.rps || 0} req/s</b></span>
+                        <span>Moved: <b class="text-on-surface">${w.last_moved ? Math.round(data.timestamp - w.last_moved) + 's ago' : 'static'}</b></span>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Section: Node Live Metrics
+        html += `<div class="text-[11px] font-bold uppercase tracking-wider text-primary mt-2 mb-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">memory</span> Node Resource Load
+                 </div>`;
+
+        Object.entries(nodes).forEach(([nName, n]) => {
+            const cpu = Math.round((n.cpu_util || 0) * 100);
+            const mem = Math.round((n.mem_util || 0) * 100);
+            const cpuColor = cpu > 80 ? 'bg-red-600' : (cpu > 50 ? 'bg-amber-500' : 'bg-[#3D52A0]');
+
+            html += `
+                <div class="p-2 border border-outline-variant/60 rounded-lg bg-surface text-xs shadow-2xs">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-on-surface">${escapeHtml(nName)}</span>
+                        <span class="text-[10px] text-on-surface-variant font-mono uppercase">${escapeHtml(n.tier || 'core')} &middot; ${escapeHtml(n.zone || '')}</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="w-7 text-[10px] text-on-surface-variant font-semibold">CPU</span>
+                        <div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+                            <div class="h-full ${cpuColor} transition-all duration-500 rounded-full" style="width: ${cpu}%"></div>
+                        </div>
+                        <span class="w-8 text-[10px] text-right font-mono font-bold">${cpu}%</span>
+                    </div>
+                    
+                    <div class="flex justify-between text-on-surface-variant pt-1 border-t border-outline-variant/30 text-[10px]">
+                        <div class="flex items-center gap-0.5" title="Memory"><span class="material-symbols-outlined text-[12px] text-primary">memory</span> ${mem}%</div>
+                        <div class="flex items-center gap-0.5" title="Power"><span class="material-symbols-outlined text-[12px] text-amber-600">bolt</span> ${Math.round(n.power_w || 0)}W</div>
+                        <div class="flex items-center gap-0.5" title="Cost"><span class="material-symbols-outlined text-[12px] text-green-700">payments</span> ₹${n.cost_per_hr}/h</div>
+                        <div class="flex items-center gap-0.5" title="Base Latency"><span class="material-symbols-outlined text-[12px] text-primary">speed</span> ${n.base_latency_ms}ms</div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // 4. Render Orchestrator Decision Log
+    function renderLogs(data) {
+        const logContainer = document.getElementById('explainability-log');
+        const logCountEl = document.getElementById('log-count');
+        const events = data.events || [];
+
+        if (logCountEl) logCountEl.innerText = `${events.length} events`;
+
+        if (!events.length) {
+            logContainer.innerHTML = `
+                <div class="text-[#757682]">&gt; Connected to state.py engine.</div>
+                <div class="text-[#757682]">&gt; Awaiting controller migration decisions...</div>
+            `;
+            return;
         }
 
-        // 4. Decision Logs & Mini Stream
-        function renderLogs(data) {
-            const events = data.events || [];
-            rawEventsList = events;
+        const isScrolledToBottom = logContainer.scrollTop + logContainer.clientHeight >= logContainer.scrollHeight - 50;
 
-            const logBadge = document.getElementById('badge-logs-count');
-            const logInd = document.getElementById('log-count-indicator');
-            if (logBadge) logBadge.innerText = events.length;
-            if (logInd) logInd.innerText = `${events.length} events logged`;
-
-            // Render Mini Stream in Cockpit (last 5 events)
-            const miniStream = document.getElementById('mini-decision-stream');
-            if (miniStream) {
-                if (!events.length) {
-                    miniStream.innerHTML = '<div class="text-slate-500">&gt; Awaiting controller loop events...</div>';
-                } else {
-                    const recent = events.slice(-8);
-                    miniStream.innerHTML = recent.map(e => formatLogLine(e)).join('');
-                    miniStream.scrollTop = miniStream.scrollHeight;
-                }
-            }
-
-            filterLogsView();
-        }
-
-        function formatLogLine(rawLine) {
+        let html = '';
+        events.forEach(rawLine => {
             const safe = escapeHtml(rawLine);
             let formatted = safe;
 
             if (safe.startsWith('MIGRATE')) {
-                formatted = `<span class="text-amber-400 font-bold">${safe}</span>`;
+                formatted = `<span class="text-yellow-400 font-bold font-mono tracking-wide">${safe}</span>`;
             } else if (safe.includes('ERROR')) {
-                formatted = `<span class="text-red-400 font-bold">${safe}</span>`;
-            } else if (safe.includes('POLICY CHANGE')) {
-                formatted = `<span class="text-brand-400 font-bold">${safe}</span>`;
-            } else if (safe.includes('CHAOS INJECT')) {
-                formatted = `<span class="text-purple-400 font-bold">${safe}</span>`;
+                formatted = `<span class="text-red-400 font-bold font-mono">${safe}</span>`;
             } else if (safe.includes('trigger')) {
-                formatted = safe.replace('trigger', '<span class="text-slate-400 font-bold">trigger</span>');
+                formatted = safe.replace('trigger', '<span class="text-[#b7c4ff] font-semibold">trigger</span>');
+            } else if (safe.includes('reasoning')) {
+                formatted = safe.replace('reasoning', '<span class="text-[#b7c4ff] font-semibold">reasoning</span>');
             } else if (safe.includes('deltas')) {
-                formatted = safe.replace('deltas', '<span class="text-slate-400 font-bold">deltas</span>')
-                                .replace(/cost\s+([+\-]\d+(?:\.\d+)?)/g, '<span class="text-emerald-400 font-bold">cost $1</span>');
+                formatted = safe.replace('deltas', '<span class="text-[#b7c4ff] font-semibold">deltas</span>')
+                                .replace(/cost\s+([+\-]\d+(?:\.\d+)?)/g, '<span class="text-green-400">cost $1</span>');
+            } else if (safe.includes('front')) {
+                formatted = safe.replace('front', '<span class="text-[#b7c4ff] font-semibold">front</span>');
             }
 
-            return `<div class="py-0.5 border-b border-dark-border/40">${formatted}</div>`;
-        }
-
-        function filterLogsView() {
-            const container = document.getElementById('full-terminal-output');
-            if (!container) return;
-
-            const searchVal = (document.getElementById('log-filter-input')?.value || '').toLowerCase();
-            const cat = document.getElementById('log-category-select')?.value || 'all';
-
-            if (!rawEventsList.length) {
-                container.innerHTML = '<div class="text-slate-500">&gt; Connected to state.py decision seam. Awaiting events...</div>';
-                return;
-            }
-
-            let filtered = rawEventsList.filter(line => {
-                const lower = line.toLowerCase();
-                if (searchVal && !lower.includes(searchVal)) return false;
-                if (cat === 'migrate' && !line.startsWith('MIGRATE')) return false;
-                if (cat === 'trigger' && !line.includes('trigger') && !line.includes('breach')) return false;
-                if (cat === 'policy' && !line.includes('POLICY')) return false;
-                if (cat === 'chaos' && !line.includes('CHAOS')) return false;
-                return true;
-            });
-
-            if (!filtered.length) {
-                container.innerHTML = '<div class="text-slate-500 p-4 text-center">No log events matching filters.</div>';
-                return;
-            }
-
-            container.innerHTML = filtered.map(e => formatLogLine(e)).join('');
-
-            if (isLogAutoScroll) {
-                container.scrollTop = container.scrollHeight;
-            }
-        }
-
-        function toggleLogAutoScroll() {
-            isLogAutoScroll = !isLogAutoScroll;
-            const btn = document.getElementById('btn-log-autoscroll');
-            if (btn) {
-                btn.innerHTML = `<span class="material-symbols-outlined text-xs">vertical_align_bottom</span> Auto-scroll: ${isLogAutoScroll ? 'ON' : 'OFF'}`;
-            }
-        }
-
-        function copyLogsToClipboard() {
-            const text = rawEventsList.join('\n');
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('All logs copied to clipboard', 'success');
-            });
-        }
-
-        function downloadLogsTxt() {
-            const blob = new Blob([rawEventsList.join('\n')], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `orchestrator-decision-log-${new Date().toISOString().substring(0,19)}.txt`;
-            a.click();
-            showToast('Decision log exported', 'info');
-        }
-
-        // 5. Pareto Solutions View
-        function renderPareto(data) {
-            const front = data.front || [];
-            const policy = data.policy || 'sla-first';
-            const tableBody = document.getElementById('pareto-table-body');
-            const countLabel = document.getElementById('pareto-candidates-count');
-            const badgeCount = document.getElementById('badge-pareto-count');
-
-            if (badgeCount) badgeCount.innerText = front.length;
-            if (countLabel) countLabel.innerText = `${front.length} Non-Dominated Candidates (${policy})`;
-
-            if (!tableBody) return;
-
-            if (!front.length) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">No Pareto candidates available</td></tr>`;
-                return;
-            }
-
-            let html = '';
-            front.forEach((cand, idx) => {
-                const isChosen = cand.chosen;
-                const rowStyle = isChosen
-                    ? 'bg-brand-950/40 text-brand-200 border-l-4 border-brand-500 font-semibold'
-                    : 'hover:bg-dark-hover/40 light:hover:bg-slate-50 transition-colors';
-
-                const statusBadge = isChosen
-                    ? `<span class="inline-flex items-center gap-1 text-[10px] font-black bg-brand-600 text-white px-2.5 py-0.5 rounded-full shadow-xs">
-                         <span class="material-symbols-outlined text-[12px]">verified</span> ACTIVE CHOICE
-                       </span>`
-                    : `<span class="text-[10px] text-slate-400 mono font-medium px-2 py-0.5 rounded bg-[#0a0b0d] light:bg-slate-100">Cand #${idx + 1}</span>`;
-
-                const violBadge = cand.sla_violations > 0
-                    ? `<span class="text-red-400 font-bold mono bg-red-950/80 px-2 py-0.5 rounded border border-red-800/40">${cand.sla_violations} breach</span>`
-                    : `<span class="text-emerald-400 font-bold mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">0 violations</span>`;
-
-                const placementHtml = Object.entries(cand.placement || {})
-                    .map(([w, n]) => `<span class="inline-block px-1.5 py-0.5 rounded bg-[#0a0b0d] light:bg-slate-100 text-[10px] mr-1 mb-0.5 mono font-medium text-slate-300 light:text-slate-700">${escapeHtml(w)} &rarr; ${escapeHtml(n)}</span>`)
-                    .join('');
-
-                const placementJsonEsc = escapeHtml(JSON.stringify(cand.placement));
-
-                html += `
-                    <tr class="${rowStyle}">
-                        <td class="p-3 whitespace-nowrap">${statusBadge}</td>
-                        <td class="p-3 whitespace-nowrap">${violBadge}</td>
-                        <td class="p-3 whitespace-nowrap mono font-bold text-white light:text-slate-900">₹${cand.cost_per_hr}</td>
-                        <td class="p-3 whitespace-nowrap mono font-bold text-amber-400">${Math.round(cand.power_w)}W</td>
-                        <td class="p-3 whitespace-nowrap mono text-slate-300 light:text-slate-700">${cand.migration_cost}</td>
-                        <td class="p-3">${placementHtml}</td>
-                        <td class="p-3 text-right whitespace-nowrap">
-                            ${isChosen ? '<span class="text-[10px] text-brand-400 mono font-bold">Selected</span>' : `<button onclick="applyCandidatePlacement('${placementJsonEsc}')" class="px-2.5 py-1 rounded bg-[#0a0b0d] hover:bg-brand-600 text-slate-300 hover:text-white border border-dark-border text-[10px] font-bold transition-all">Apply</button>`}
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tableBody.innerHTML = html;
-        }
-
-        // 6. Latency Analytics Charts
-        function renderCharts(history, workloads) {
-            if (isChartPaused || !history || !history.length) return;
-
-            const now = history[history.length - 1].t;
-            const cutoff = -chartWindowSec;
-            const names = Object.keys(workloads || {});
-
-            const fullDatasets = [];
-            const miniDatasets = [];
-
-            names.forEach(name => {
-                const color = getWorkloadColor(name);
-                const pts = history
-                    .filter(h => h.workloads && h.workloads[name] != null)
-                    .map(h => ({ x: +(h.t - now).toFixed(1), y: h.workloads[name] }))
-                    .filter(pt => pt.x >= cutoff);
-
-                fullDatasets.push({
-                    label: name,
-                    borderColor: color,
-                    backgroundColor: color,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.2,
-                    data: pts,
-                });
-
-                miniDatasets.push({
-                    label: name,
-                    borderColor: color,
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.2,
-                    data: pts,
-                });
-
-                // SLA Reference Line on Full Chart
-                if (workloads[name] && workloads[name].sla_ms) {
-                    fullDatasets.push({
-                        label: `${name} SLA (${workloads[name].sla_ms}ms)`,
-                        borderColor: color,
-                        borderWidth: 1,
-                        borderDash: [5, 4],
-                        pointRadius: 0,
-                        data: [{ x: cutoff, y: workloads[name].sla_ms }, { x: 0, y: workloads[name].sla_ms }]
-                    });
-                }
-            });
-
-            if (fullLatencyChart) {
-                fullLatencyChart.data.datasets = fullDatasets;
-                fullLatencyChart.options.scales.x.min = cutoff;
-                fullLatencyChart.options.scales.x.max = 0;
-                fullLatencyChart.update();
-            }
-
-            if (miniLatencyChart) {
-                miniLatencyChart.data.datasets = miniDatasets;
-                miniLatencyChart.options.scales.x.min = cutoff;
-                miniLatencyChart.options.scales.x.max = 0;
-                miniLatencyChart.update();
-            }
-
-            // Analytics Workload Breakdown Cards
-            const grid = document.getElementById('analytics-workload-breakdown');
-            if (grid && names.length) {
-                grid.innerHTML = names.map(wName => {
-                    const meta = workloads[wName];
-                    const isBreach = meta.p99_ms > meta.sla_ms;
-                    return `
-                        <div class="bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white rounded-xl border border-dark-border light:border-slate-200 p-4 shadow-sm flex flex-col justify-between">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-extrabold text-sm text-white light:text-slate-900">${escapeHtml(wName)}</span>
-                                <span class="text-[9px] font-bold px-2 py-0.5 rounded mono ${isBreach ? 'bg-red-950 text-red-400 border border-red-700/50' : 'bg-emerald-950 text-emerald-400 border border-emerald-800/40'}">${isBreach ? 'SLA BREACH' : 'SLA HEALTHY'}</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2 text-xs mono text-slate-400">
-                                <div><span>Measured p99:</span> <b class="${isBreach ? 'text-red-400' : 'text-white light:text-slate-900'}">${meta.p99_ms}ms</b></div>
-                                <div><span>SLA Target:</span> <b class="text-brand-400">${meta.sla_ms}ms</b></div>
-                                <div><span>Current Node:</span> <b class="text-slate-200 light:text-slate-800">${meta.node}</b></div>
-                                <div><span>Throughput:</span> <b class="text-slate-200 light:text-slate-800">${meta.rps} rps</b></div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-
-        // 7. Chaos & Simulator Bench Views
-        function renderChaosAndSpecs(data) {
-            const nodes = data.nodes || {};
-            const workloads = data.workloads || {};
-
-            // Chaos Workload Sliders
-            const chaosSliders = document.getElementById('chaos-workload-sliders');
-            if (chaosSliders) {
-                chaosSliders.innerHTML = Object.entries(workloads).map(([wName, w]) => `
-                    <div class="p-3 bg-[#0a0b0d] light:bg-slate-100 rounded-xl border border-dark-border light:border-slate-200 flex flex-col gap-2">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-xs text-white light:text-slate-900">${escapeHtml(wName)}</span>
-                            <span class="text-[10px] text-slate-400 mono">Placement: <b>${w.node}</b></span>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <div class="flex justify-between text-[10px] mono text-slate-400 mb-1">
-                                    <span>RPS Load: <b id="lbl-rps-${wName}" class="text-brand-400">${w.rps}</b></span>
-                                </div>
-                                <input type="range" min="50" max="900" step="25" value="${w.rps}" oninput="document.getElementById('lbl-rps-${wName}').innerText = this.value" onchange="updateWorkloadSlider('${wName}', this.value, undefined)" class="w-full accent-brand-500 cursor-pointer"/>
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between text-[10px] mono text-slate-400 mb-1">
-                                    <span>SLA Target: <b id="lbl-sla-${wName}" class="text-amber-400">${w.sla_ms}ms</b></span>
-                                </div>
-                                <input type="range" min="10" max="600" step="10" value="${w.sla_ms}" oninput="document.getElementById('lbl-sla-${wName}').innerText = this.value + 'ms'" onchange="updateWorkloadSlider('${wName}', undefined, this.value)" class="w-full accent-amber-500 cursor-pointer"/>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // Chaos Node Outage Toggles
-            const chaosNodes = document.getElementById('chaos-nodes-list');
-            if (chaosNodes) {
-                chaosNodes.innerHTML = Object.entries(nodes).map(([nName, n]) => `
-                    <div class="p-3 bg-[#0a0b0d] light:bg-slate-100 rounded-xl border border-dark-border light:border-slate-200 flex justify-between items-center">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full ${n.ready ? 'bg-emerald-500' : 'bg-red-500'}"></span>
-                            <div>
-                                <h4 class="font-bold text-xs text-white light:text-slate-900">${escapeHtml(nName)}</h4>
-                                <span class="text-[10px] text-slate-400 mono">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}</span>
-                            </div>
-                        </div>
-                        <button onclick="toggleNodeStatus('${nName}')" class="text-[10px] font-bold px-3 py-1 rounded-lg ${n.ready ? 'bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-700/50' : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50'} transition-all">
-                            ${n.ready ? 'Force Outage (Kill)' : 'Restore Node'}
-                        </button>
-                    </div>
-                `).join('');
-            }
-
-            // Hardware Specs
-            const specsNodes = document.getElementById('specs-nodes-container');
-            if (specsNodes) {
-                specsNodes.innerHTML = Object.entries(nodes).map(([name, n]) => `
-                    <div class="p-3 bg-[#0a0b0d] light:bg-slate-100 rounded-xl border border-dark-border light:border-slate-200 text-xs">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <span class="font-bold text-brand-400 mono">${escapeHtml(name)}</span>
-                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-200">${escapeHtml(n.tier)} · ${escapeHtml(n.zone || '')}</span>
-                        </div>
-                        <div class="grid grid-cols-4 gap-2 text-[10px] mono text-slate-400">
-                            <div><span>Cores:</span> <b class="text-slate-200 light:text-slate-800">${n.cpu_cores}</b></div>
-                            <div><span>Base Lat:</span> <b class="text-brand-400">${n.base_latency_ms}ms</b></div>
-                            <div><span>Rate:</span> <b class="text-slate-200 light:text-slate-800">₹${n.cost_per_hr}/hr</b></div>
-                            <div><span>Power:</span> <b class="text-amber-400">${Math.round(n.power_w)}W</b></div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // Workload Specs
-            const specsWorkloads = document.getElementById('specs-workloads-container');
-            if (specsWorkloads) {
-                specsWorkloads.innerHTML = Object.entries(workloads).map(([name, w]) => `
-                    <div class="p-3 bg-[#0a0b0d] light:bg-slate-100 rounded-xl border border-dark-border light:border-slate-200 text-xs">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <span class="font-bold text-emerald-400 mono">${escapeHtml(name)}</span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-gradient-to-b from-[#1a1d24] to-[#121418] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] light:bg-white border border-dark-border light:border-slate-200 mono">${escapeHtml(w.class || 'standard')}</span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 text-[10px] mono text-slate-400">
-                            <div><span>SLA Target:</span> <b class="text-brand-400">${w.sla_ms}ms</b></div>
-                            <div><span>Current Node:</span> <b class="text-slate-200 light:text-slate-800">${w.node}</b></div>
-                            <div><span>Throughput:</span> <b class="text-slate-200 light:text-slate-800">${w.rps} req/s</b></div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // Main State Loop
-        // ---------------------------------------------------------------------
-        async function pollState() {
-            try {
-                const res = await fetch('/api/state');
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                latestState = data;
-
-                renderHeaderAndRibbon(data);
-                renderCockpitNodes(data);
-                renderCockpitWorkloads(data);
-                renderLogs(data);
-                renderPareto(data);
-                renderCharts(data.history, data.workloads);
-                renderChaosAndSpecs(data);
-
-                // Track migrations
-                if (data.workloads) {
-                    const currentMap = {};
-                    Object.entries(data.workloads).forEach(([w, m]) => {
-                        currentMap[w] = m.node;
-                    });
-                    prevPlacementMap = currentMap;
-                }
-
-            } catch (err) {
-                console.error("State polling error:", err);
-                renderHeaderAndRibbon({ connected: false, waiting: false, age_s: '?' });
-            }
-        }
-
-        // Bootstrapping
-        window.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            setInterval(pollState, 1000);
-            pollState();
+            html += `<div class="py-0.5 border-b border-[#233049]/30">${formatted}</div>`;
         });
-    </script>
+
+        logContainer.innerHTML = html;
+
+        if (isScrolledToBottom || events.length !== lastRenderedEventsCount) {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        lastRenderedEventsCount = events.length;
+    }
+
+    // 5. Render Pareto Front Table
+    function renderParetoFront(data) {
+        const tableBody = document.getElementById('pareto-table-body');
+        const cap = document.getElementById('pareto-cap');
+        const front = data.front || [];
+        const policy = data.policy || 'sla-first';
+
+        if (cap) {
+            cap.innerText = `${front.length} non-dominated · policy '${policy}'`;
+        }
+
+        if (!front.length) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="p-6 text-center text-on-surface-variant">
+                        No feasible Pareto candidate placements &mdash; holding current state
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        front.forEach((cand, idx) => {
+            const isChosen = cand.chosen;
+            const rowClass = isChosen 
+                ? 'bg-primary-container/15 font-semibold text-primary border-l-4 border-primary' 
+                : 'hover:bg-surface-container transition-colors';
+
+            const statusBadge = isChosen
+                ? '<span class="inline-flex items-center gap-1 text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded shadow-xs"><span class="material-symbols-outlined text-[12px]">check_circle</span> ACTIVE</span>'
+                : `<span class="text-[10px] text-on-surface-variant font-medium px-2 py-0.5 rounded bg-surface-container">Cand #${idx + 1}</span>`;
+
+            const violBadge = cand.sla_violations > 0
+                ? `<span class="text-red-700 font-bold">${cand.sla_violations} breach</span>`
+                : `<span class="text-green-700 font-bold">0</span>`;
+
+            const placementSummary = Object.entries(cand.placement || {})
+                .map(([w, n]) => `<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container-high text-[10px] mr-1 mb-1 font-mono">${escapeHtml(w)} &rarr; ${escapeHtml(n)}</span>`)
+                .join('');
+
+            html += `
+                <tr class="${rowClass}">
+                    <td class="p-sm whitespace-nowrap">${statusBadge}</td>
+                    <td class="p-sm whitespace-nowrap">${violBadge}</td>
+                    <td class="p-sm whitespace-nowrap font-mono">₹${cand.cost_per_hr}</td>
+                    <td class="p-sm whitespace-nowrap font-mono">${Math.round(cand.power_w)}W</td>
+                    <td class="p-sm whitespace-nowrap font-mono">${cand.migration_cost}</td>
+                    <td class="p-sm">${placementSummary}</td>
+                </tr>
+            `;
+        });
+
+        tableBody.innerHTML = html;
+    }
+
+    // Main Polling Loop
+    async function pollState() {
+        try {
+            const response = await fetch('/api/state');
+            if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+            
+            const data = await response.json();
+
+            updateHeaderAndKPIs(data);
+            renderTopology(data);
+            renderTelemetry(data);
+            renderLogs(data);
+            renderParetoFront(data);
+
+            // Store current placements for migration animation tracking
+            if (data.workloads) {
+                const nextPlacements = {};
+                Object.entries(data.workloads).forEach(([wName, wMeta]) => {
+                    nextPlacements[wName] = wMeta.node;
+                });
+                prevPlacements = nextPlacements;
+            }
+
+        } catch (error) {
+            console.error("Failed to fetch state from state.py backend:", error);
+            updateHeaderAndKPIs({ connected: false, waiting: false, age_s: '?' });
+        }
+    }
+
+    // Start Polling
+    setInterval(pollState, 1000);
+    pollState();
+</script>
+
 </body>
 </html>
+
+
