@@ -38,14 +38,14 @@ SLA_OVERRIDES: Dict[str, float] = {}
 NODE_STATE_OVERRIDES: Dict[str, dict] = {}
 
 _DEFAULT_NODES = {
-    "core-master": dict(tier="core", zone="core-1", base_latency_ms=40.0,
-                        cost_per_hr=2.0, cpu_cores=16.0, idle_w=7.5, max_w=30.0, service_ms=1.2, raw_hostname="willson"),
-    "core-node-01": dict(tier="core", zone="core-2", base_latency_ms=42.0,
-                         cost_per_hr=2.1, cpu_cores=12.0, idle_w=25.0, max_w=135.0, service_ms=1.2, raw_hostname="archlinux"),
-    "edge-node-01": dict(tier="edge", zone="edge-1", base_latency_ms=4.0,
-                         cost_per_hr=9.0, cpu_cores=8.0, idle_w=12.0, max_w=45.0, service_ms=2.0, raw_hostname="fedora"),
-    "edge-node-02": dict(tier="edge", zone="edge-2", base_latency_ms=3.0,
-                         cost_per_hr=9.0, cpu_cores=8.0, idle_w=8.0, max_w=35.0, service_ms=2.0, raw_hostname="desktop-prnd0ve"),
+    "laptop-1": dict(tier="core", zone="core-1", base_latency_ms=40.0,
+                     cost_per_hr=2.0, cpu_cores=8.0, idle_w=25.0, max_w=65.0, service_ms=1.2),
+    "laptop-2": dict(tier="edge", zone="edge-1", base_latency_ms=3.0,
+                     cost_per_hr=9.0, cpu_cores=4.0, idle_w=12.0, max_w=45.0, service_ms=2.0),
+    "laptop-3": dict(tier="edge", zone="edge-2", base_latency_ms=4.0,
+                     cost_per_hr=9.0, cpu_cores=2.0, idle_w=12.0, max_w=45.0, service_ms=2.5),
+    "laptop-4": dict(tier="core", zone="core-2", base_latency_ms=38.0,
+                     cost_per_hr=2.2, cpu_cores=8.0, idle_w=25.0, max_w=65.0, service_ms=1.2),
 }
 
 _DEFAULT_WORKLOADS = {
@@ -55,9 +55,9 @@ _DEFAULT_WORKLOADS = {
 }
 
 _current_placement: Dict[str, str] = {
-    "checkout": "edge-node-02",
-    "recommend": "edge-node-01",
-    "analytics": "core-master",
+    "checkout": "laptop-2",
+    "recommend": "laptop-3",
+    "analytics": "laptop-2",
 }
 _last_moved: Dict[str, float] = {w: 0.0 for w in _DEFAULT_WORKLOADS}
 _ORIGIN = time.time()
