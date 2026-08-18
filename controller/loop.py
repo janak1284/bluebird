@@ -198,7 +198,7 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
         idle_w = static.get("idle_w") or data.get("idle_w") or (12.0 if is_edge else 25.0)
         max_w = static.get("max_w") or data.get("max_w") or (45.0 if is_edge else 65.0)
         
-        n = Node(name=name, raw_hostname=data.get("raw_hostname", ""), tier=tier, cores=cores, base_latency_ms=base_lat, cost_per_hr=cost, idle_w=idle_w, max_w=max_w, ready=data.get("ready", True))
+        n = Node(name=name, raw_hostname=data.get("raw_hostname", ""), tier=tier, cores=cores, base_latency_ms=base_lat, cost_per_hr=cost, idle_w=idle_w, max_w=max_w, ready=data.get("ready", True), current_power_w=data.get("power_w", idle_w))
         n.zone = static.get("zone") or data.get("zone") or tier
         nodes[name] = n
     workloads = {

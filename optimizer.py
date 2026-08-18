@@ -27,6 +27,7 @@ class Node:
     ready: bool = True
     service_ms: float = 2.0  # mean per-request service time on this node
     raw_hostname: str = ""
+    current_power_w: float = 0.0
 
 @dataclass
 class Workload:
@@ -129,7 +130,7 @@ def evaluate(placement: Placement, nodes: Dict[str, Node],
     # only nodes actually carrying load are billed / powered up
     active = [n for n in nodes if load[n] > 0]
     cost = sum(nodes[n].cost_per_hr for n in active)
-    power = sum(node_power(nodes[n], util[n]) for n in active)
+    power = sum(nodes[n].current_power_w for n in active)
 
     migration = sum(workloads[w].size_units
                     for w, n in placement.items()

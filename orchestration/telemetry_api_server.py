@@ -169,7 +169,10 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                 else:
                     effective_status = phase
                     cpu_u = node_cpu_map.get(display_node, 0.01)
-                    rps = 250 if phase == "Running" else 0
+                    if phase == "Running":
+                        rps = 20000 if "profile" in pod_name else 250
+                    else:
+                        rps = 0
                     queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - cpu_u, 0.05))
                     p99_ms = round(base_lat + queuing_delay, 1) if phase == "Running" else 0.0
                 

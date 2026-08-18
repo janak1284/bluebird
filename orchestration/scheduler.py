@@ -16,7 +16,14 @@ NODE_ENDPOINT_MAP = {
     "fedora":        {"ip": "10.243.176.218"},
     "edge-node-01":  {"ip": "10.243.176.218"},
     "archlinux":     {"ip": "10.243.176.3"},
-    "core-node-01":   {"ip": "10.243.176.3"},
+    "edge-node-03":  {"ip": "10.243.176.3"},
+}
+
+ALIAS_TO_K8S_NODE = {
+    "core-master": "willson",
+    "edge-node-01": "fedora",
+    "edge-node-03": "archlinux",
+    "edge-node-02": "desktop-prnd0ve",
 }
 
 WORKLOAD_ROUTE_MAP = {
@@ -93,12 +100,14 @@ def execute_make_before_break_migration(workload_name, target_node):
     
     t_start = time.time()
     
+    k8s_target_node = ALIAS_TO_K8S_NODE.get(target_node, target_node)
+    
     # 1. Update Deployment spec nodeName in K3s
     patch_payload = json.dumps({
         "spec": {
             "template": {
                 "spec": {
-                    "nodeName": target_node
+                    "nodeName": k8s_target_node
                 }
             }
         }
@@ -127,7 +136,7 @@ def execute_make_before_break_migration(workload_name, target_node):
                 p_node = item['spec'].get('nodeName', '')
                 p_phase = item['status'].get('phase', '')
                 
-                if p_name.startswith(workload_name) and p_node == target_node and p_phase == "Running":
+                if p_name.startswith(workload_name) and p_node == k8s_target_node and p_phase == "Running":
                     for cond in item['status'].get('conditions', []):
                         if cond['type'] == 'Ready' and cond['status'] == 'True':
                             new_pod_ready = True
@@ -147,7 +156,12 @@ def execute_make_before_break_migration(workload_name, target_node):
     print(f"  [2/4] New container on '{target_node}' is RUNNING and READY! (Transfer Time: {transfer_time}s)")
     
     # 3. Execute Instant Router Table Cutover
-    route_info = WORKLOAD_ROUTE_MAP.get(workload_name, {})
+    route_info = {}
+    for wl_name, wl_info in WORKLOAD_ROUTE_MAP.items():
+        if workload_name.startswith(wl_name):
+            route_info = wl_info
+            break
+            
     route_path = route_info.get("route", "/checkout")
     node_port = route_info.get("node_port", 30081)
     
