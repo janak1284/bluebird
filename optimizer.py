@@ -51,7 +51,8 @@ def node_load(placement: Placement, nodes: Dict[str, Node],
     load = {n: 0.0 for n in nodes}
     for w_name, n_name in placement.items():
         w = workloads[w_name]
-        load[n_name] += w.rps * w.cores_per_rps
+        if n_name in load:
+            load[n_name] += w.rps * w.cores_per_rps
     return load
 
 
@@ -80,6 +81,8 @@ def feasible(placement: Placement, nodes: Dict[str, Node],
     load = node_load(placement, nodes, workloads)
 
     for w_name, n_name in placement.items():
+        if n_name not in nodes:
+            return False
         w, n = workloads[w_name], nodes[n_name]
 
         if not n.ready:                       # node down
@@ -120,6 +123,10 @@ def evaluate(placement: Placement, nodes: Dict[str, Node],
     violations, breach_ms = 0, 0.0
     for w_name, n_name in placement.items():
         w = workloads[w_name]
+        if n_name not in nodes:
+            violations += 1
+            breach_ms += 10000.0
+            continue
         p99 = predicted_p99(w, nodes[n_name], util[n_name])
         if p99 > w.sla_ms:
             violations += 1

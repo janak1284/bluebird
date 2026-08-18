@@ -111,6 +111,7 @@ def api_state():
         payload = {
             "timestamp": ts,
             "policy": snapshot.get("policy", "sla-first"),
+            "policy_mode": snapshot.get("policy_mode"),
             "nodes": snapshot.get("nodes", {}),
             "workloads": snapshot.get("workloads", {}),
             "front": snapshot.get("front", []),
