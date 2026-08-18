@@ -8,14 +8,17 @@ import threading
 import urllib.request
 import urllib.parse
 import subprocess
+import random
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+_active_scenario = {"type": None, "target": None, "expiry": 0, "value": 0}
 
 # Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
     "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
-    "archlinux":    {"alias": "edge-node-03", "tier": "edge", "zone": "edge-3", "base_latency_ms": 5, "cost_per_hr": 9.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
+    "archlinux":    {"alias": "edge-node-03", "tier": "edge", "zone": "edge-3", "base_latency_ms": 5, "cost_per_hr": 12.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
     "fedora":       {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
-    "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 3,  "cost_per_hr": 9.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
+    "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 3,  "cost_per_hr": 6.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
 }
 
 PROMETHEUS_URL = "http://localhost:9090/api/v1/query"
@@ -170,7 +173,11 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     effective_status = phase
                     cpu_u = node_cpu_map.get(display_node, 0.01)
                     if phase == "Running":
-                        rps = 20000 if "profile" in pod_name else 250
+                        base_rps = 250
+                        if _active_scenario["type"] == "rps_spike" and _active_scenario["target"] and _active_scenario["target"] in pod_name and time.time() < _active_scenario["expiry"]:
+                            rps = _active_scenario["value"]
+                        else:
+                            rps = base_rps
                     else:
                         rps = 0
                     queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - cpu_u, 0.05))
@@ -240,9 +247,6 @@ def background_telemetry_collector():
     """Asynchronous background worker with self-healing Prometheus port-forward connection."""
     global _cached_snapshot_bytes, _cached_all_nodes_bytes, _cached_pods_bytes
     
-    base_data = get_base_node_profiles()
-    _cached_all_nodes_bytes = json.dumps(base_data, indent=2).encode('utf-8')
-    
     while True:
         try:
             live_nodes_info = fetch_k3s_node_info()
@@ -303,6 +307,16 @@ def background_telemetry_collector():
                     "power_w": power_w
                 }
                 
+                # Apply scenario overrides to node snapshot
+                if time.time() < _active_scenario["expiry"] and _active_scenario["target"] in [node_name, display_name]:
+                    if _active_scenario["type"] == "cpu_stress":
+                        nodes_data[display_name]["cpu_cores"] = _active_scenario["value"]
+                        nodes_data[display_name]["cpu_util"] = 0.99
+                    elif _active_scenario["type"] == "power_spike":
+                        nodes_data[display_name]["power_w"] = _active_scenario["value"]
+                    elif _active_scenario["type"] == "network_degrade":
+                        nodes_data[display_name]["base_latency_ms"] = _active_scenario["value"]
+                
             live_pods = fetch_k3s_pods(node_cpu_map, live_nodes_info)
             
             snapshot = {
@@ -312,6 +326,19 @@ def background_telemetry_collector():
                 "workloads": live_pods
             }
             
+            # Apply scenario overrides to base nodes config
+            base_data = get_base_node_profiles()
+            if time.time() < _active_scenario["expiry"]:
+                for dn, n_data in base_data["nodes"].items():
+                    if _active_scenario["target"] in [n_data["raw_hostname"], dn]:
+                        if _active_scenario["type"] == "cpu_stress":
+                            n_data["cpu_cores"] = _active_scenario["value"]
+                        elif _active_scenario["type"] == "power_spike":
+                            n_data["max_w"] = _active_scenario["value"]
+                        elif _active_scenario["type"] == "network_degrade":
+                            n_data["base_latency_ms"] = _active_scenario["value"]
+            
+            _cached_all_nodes_bytes = json.dumps(base_data, indent=2).encode('utf-8')
             _cached_snapshot_bytes = json.dumps(snapshot, indent=2).encode('utf-8')
             _cached_pods_bytes = json.dumps({"pods": live_pods}, indent=2).encode('utf-8')
         except Exception:
@@ -320,6 +347,45 @@ def background_telemetry_collector():
         time.sleep(0.8)
 
 class TelemetryAPIHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        global _active_scenario
+        if self.path in ["/api/v1/ddos"]:
+            scenarios = ["rps_spike", "cpu_stress", "power_spike", "network_degrade"]
+            scenario = random.choice(scenarios)
+            _active_scenario["type"] = scenario
+            _active_scenario["expiry"] = time.time() + 30
+            
+            if scenario == "rps_spike":
+                _active_scenario["target"] = random.choice(["checkout", "profile", "analytics"])
+                _active_scenario["value"] = random.randint(15000, 25000)
+            else:
+                _active_scenario["target"] = random.choice(["willson", "archlinux", "fedora", "desktop-prnd0ve"])
+                if scenario == "cpu_stress": _active_scenario["value"] = 1.0
+                elif scenario == "power_spike": _active_scenario["value"] = random.randint(200, 300)
+                elif scenario == "network_degrade": _active_scenario["value"] = random.randint(200, 400)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "Scenario launched",
+                "type": scenario,
+                "target": _active_scenario["target"],
+                "value": _active_scenario["value"]
+            }).encode('utf-8'))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        if self.path in ["/api/v1/ddos"]:
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.end_headers()
+
     def do_GET(self):
         if self.path in ["/", "/snapshot", "/api/v1/snapshot"]:
             self._send_bytes(_cached_snapshot_bytes)
