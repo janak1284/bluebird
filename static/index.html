@@ -166,9 +166,6 @@
                 <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse"></div>
                 <span id="status-text" class="text-[10px] font-bold text-green-800 uppercase tracking-wider">Live &middot; state.py</span>
             </div>
-            <button onclick="launchDDOS()" class="ml-4 bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow-md shadow-red-500/50 flex items-center gap-1 transition-all active:scale-95">
-                <span class="material-symbols-outlined text-[16px]">bolt</span> Launch Random DDOS
-            </button>
         </div>
         <div class="flex items-center gap-lg">
             <div class="font-mono text-xs text-on-surface-variant bg-surface-container px-sm py-xs rounded border border-outline-variant" id="live-clock">
@@ -375,6 +372,7 @@
     // State Tracking
     let prevPlacements = {};
     let lastRenderedEventsCount = 0;
+    let lastEventString = "";
 
     // Clock
     function updateClock() {
@@ -391,6 +389,14 @@
         return String(str).replace(/[&<>"']/g, function (m) {
             return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m];
         });
+    }
+
+    // Helper: Format Bps
+    function formatBps(bps) {
+        if (!bps && bps !== 0) return '0 B/s';
+        if (bps < 1000) return bps + ' B/s';
+        if (bps < 1000000) return (bps / 1000).toFixed(1) + ' KB/s';
+        return (bps / 1000000).toFixed(1) + ' MB/s';
     }
 
     async function setPolicy(policyName) {
@@ -523,33 +529,28 @@
                         : 'bg-[#7091E6]/20 text-[#233a87] border-[#7091E6]/40 font-medium';
 
                     return `
-                        <span class="text-[11px] px-2 py-1 rounded border flex items-center gap-1 ${badgeStyle} ${animClass} transition-all shadow-xs" title="SLA: ${w.sla_ms}ms · Class: ${w.class || 'standard'}">
-                            <span class="material-symbols-outlined text-[13px]">${isBreach ? 'error' : 'task_alt'}</span>
-                            <span class="font-semibold">${escapeHtml(w.name)}</span>
-                            <span class="opacity-80">· ${w.p99_ms}ms</span>
-                        </span>
+                        <div class="flex flex-col gap-1 text-[11px] px-2 py-1.5 rounded border ${badgeStyle} ${animClass} transition-all shadow-xs" title="SLA: ${w.sla_ms}ms · Class: ${w.class || 'standard'}">
+                            <div class="flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px]">${isBreach ? 'error' : 'task_alt'}</span>
+                                <span class="font-semibold">${escapeHtml(w.name)}</span>
+                                <span class="opacity-80">· ${w.p99_ms}ms</span>
+                            </div>
+                            <div class="mt-0.5">
+                                <select class="manual-migrate-select text-[9px] py-0 px-1 border border-outline-variant/50 rounded bg-white/50 hover:bg-white text-on-surface w-full cursor-pointer focus:ring-0 outline-none" onchange="manualMigrate('${w.name}', this.value); this.value=''">
+                                    <option value="" disabled selected>Move to...</option>
+                                    ${Object.keys(data.nodes).filter(n => n !== nodeName && data.nodes[n].ready).map(n => `<option value="${n}">${n}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
                     `;
                 }).join('');
             }
 
-            html += `
-                <div class="card-border rounded-lg p-sm lg:p-md bg-surface-container flex flex-col relative group hover:border-[#7091E6] transition-all shadow-xs ${n.ready ? '' : 'opacity-50'}">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="flex items-center gap-sm text-primary">
-                            <span class="material-symbols-outlined text-xl">${nodeIcon}</span>
-                            <div>
-                                <h3 class="font-bold text-sm text-primary">${escapeHtml(nodeName)}</h3>
-                                <span class="text-[10px] text-on-surface-variant font-mono">${escapeHtml(n.zone || n.tier)}</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            ${n.ready ? '' : '<span class="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">DOWN</span>'}
-                            ${tierBadge}
-                        </div>
-                    </div>
-
+            let bodyHtml = '';
+            if (n.ready) {
+                bodyHtml = `
                     <!-- Specs Row -->
-                    <div class="grid grid-cols-4 gap-1 p-1.5 bg-surface rounded border border-outline-variant/40 mb-3 text-[10px] text-on-surface-variant">
+                    <div class="grid grid-cols-4 gap-1 p-1.5 bg-surface rounded border border-outline-variant/40 mb-1.5 text-[10px] text-on-surface-variant">
                         <div class="flex flex-col">
                             <span class="opacity-75">Cores</span>
                             <span class="font-bold text-on-surface text-xs">${n.cpu_cores || 0}</span>
@@ -566,6 +567,12 @@
                             <span class="opacity-75">Power</span>
                             <span class="font-bold text-amber-700 text-xs">${Math.round(n.power_w || 0)}W</span>
                         </div>
+                    </div>
+
+                    <!-- Network Row -->
+                    <div class="flex justify-between p-1.5 bg-surface rounded border border-outline-variant/40 mb-3 text-[10px] text-on-surface-variant">
+                        <div class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px] text-green-600">download</span> <span class="font-bold font-mono text-on-surface">${formatBps(n.net_rx_bps)}</span></div>
+                        <div class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px] text-blue-600">upload</span> <span class="font-bold font-mono text-on-surface">${formatBps(n.net_tx_bps)}</span></div>
                     </div>
 
                     <!-- Meters -->
@@ -597,6 +604,33 @@
                             ${pillsHtml}
                         </div>
                     </div>
+                `;
+            } else {
+                bodyHtml = `
+                    <div class="flex-1 flex flex-col items-center justify-center py-6 text-on-surface-variant opacity-60">
+                        <span class="material-symbols-outlined text-3xl mb-2">link_off</span>
+                        <span class="text-[10px] font-bold uppercase tracking-widest">Node Offline</span>
+                        <span class="text-[9px] mt-1 text-center">Metrics & specs unavailable<br>Telemetry disconnected</span>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="card-border rounded-lg p-sm lg:p-md bg-surface-container flex flex-col relative group hover:border-[#7091E6] transition-all shadow-xs ${n.ready ? '' : 'opacity-60 bg-surface-container-low grayscale-[50%]'}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-sm text-primary">
+                            <span class="material-symbols-outlined text-xl ${n.ready ? '' : 'opacity-50'}">${nodeIcon}</span>
+                            <div class="${n.ready ? '' : 'opacity-50'}">
+                                <h3 class="font-bold text-sm text-primary">${escapeHtml(nodeName)}</h3>
+                                <span class="text-[10px] text-on-surface-variant font-mono">${escapeHtml(n.zone || n.tier)}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            ${n.ready ? '' : '<span class="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">DOWN</span>'}
+                            ${tierBadge}
+                        </div>
+                    </div>
+                    ${bodyHtml}
                 </div>
             `;
         });
@@ -651,7 +685,7 @@
                     </div>
 
                     <div class="flex justify-between text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/30 font-mono">
-                        <span>Throughput: <b class="text-on-surface">${w.rps || 0} req/s</b></span>
+                        <span>Rate: <b class="text-on-surface">${w.rps || 0} rps</b></span>
                         <span>Moved: <b class="text-on-surface">${w.last_moved ? Math.round(data.timestamp - w.last_moved) + 's ago' : 'static'}</b></span>
                     </div>
                 </div>
@@ -686,8 +720,8 @@
                     <div class="flex justify-between text-on-surface-variant pt-1 border-t border-outline-variant/30 text-[10px]">
                         <div class="flex items-center gap-0.5" title="Memory"><span class="material-symbols-outlined text-[12px] text-primary">memory</span> ${mem}%</div>
                         <div class="flex items-center gap-0.5" title="Power"><span class="material-symbols-outlined text-[12px] text-amber-600">bolt</span> ${Math.round(n.power_w || 0)}W</div>
-                        <div class="flex items-center gap-0.5" title="Cost"><span class="material-symbols-outlined text-[12px] text-green-700">payments</span> ₹${n.cost_per_hr}/h</div>
-                        <div class="flex items-center gap-0.5" title="Base Latency"><span class="material-symbols-outlined text-[12px] text-primary">speed</span> ${n.base_latency_ms}ms</div>
+                        <div class="flex items-center gap-0.5" title="Net Rx"><span class="material-symbols-outlined text-[12px] text-green-600">download</span> ${formatBps(n.net_rx_bps)}</div>
+                        <div class="flex items-center gap-0.5" title="Net Tx"><span class="material-symbols-outlined text-[12px] text-blue-600">upload</span> ${formatBps(n.net_tx_bps)}</div>
                     </div>
                 </div>
             `;
@@ -739,10 +773,11 @@
 
         logContainer.innerHTML = html;
 
-        if (isScrolledToBottom || events.length !== lastRenderedEventsCount) {
+        const currentEventString = events.length > 0 ? events[events.length - 1] : "";
+        if (isScrolledToBottom || currentEventString !== lastEventString) {
             logContainer.scrollTop = logContainer.scrollHeight;
         }
-        lastRenderedEventsCount = events.length;
+        lastEventString = currentEventString;
     }
 
     // 5. Render Pareto Front Table
@@ -810,7 +845,15 @@
             const data = await response.json();
 
             updateHeaderAndKPIs(data);
-            renderTopology(data);
+            
+            // Prevent topology re-render if user is interacting with a dropdown
+            const activeEl = document.activeElement;
+            const isDropdownFocused = activeEl && activeEl.tagName === 'SELECT' && activeEl.classList.contains('manual-migrate-select');
+            
+            if (!isDropdownFocused) {
+                renderTopology(data);
+            }
+            
             renderTelemetry(data);
             renderLogs(data);
             renderParetoFront(data);
@@ -833,26 +876,23 @@
     // Start Polling
     setInterval(pollState, 1000);
     pollState();
-    // Launch Random DDOS
-    async function launchDDOS() {
+
+    // Manual Migration
+    async function manualMigrate(workload, targetNode) {
+        if (!targetNode) return;
         try {
-            const btn = document.querySelector('button[onclick="launchDDOS()"]');
-            if(btn) btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span> Launching...';
-            
-            const res = await fetch('http://localhost:8080/api/v1/ddos', { method: 'POST' });
-            
-            if(btn) btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">bolt</span> Launch Random DDOS';
-            if(!res.ok) throw new Error("Failed");
-            
-            const data = await res.json();
-            console.log("DDOS Launched on", data.target, "at", data.rps, "RPS");
+            const res = await fetch('/api/migrate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workload: workload, target_node: targetNode })
+            });
+            if (!res.ok) throw new Error("Migration API failed");
+            console.log(`Triggered manual migration of ${workload} to ${targetNode}`);
         } catch(e) {
             console.error(e);
-            const btn = document.querySelector('button[onclick="launchDDOS()"]');
-            if(btn) btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">bolt</span> Launch Random DDOS';
+            alert("Failed to trigger manual migration.");
         }
     }
 </script>
-
 </body>
 </html>

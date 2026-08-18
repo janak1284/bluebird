@@ -11,7 +11,7 @@ import subprocess
 import random
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-_active_scenario = {"type": None, "target": None, "expiry": 0, "value": 0}
+
 
 # Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
@@ -142,6 +142,9 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                 node_name = item['spec'].get('nodeName', 'unassigned')
                 phase = item['status'].get('phase', 'Unknown')
                 
+                if item['metadata'].get('deletionTimestamp'):
+                    phase = "Terminating"
+                
                 is_node_ready = live_nodes_info.get(node_name, {}).get("ready", False)
                 
                 profile = NODE_PROFILES.get(node_name, {"alias": node_name, "base_latency_ms": 10})
@@ -173,11 +176,7 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     effective_status = phase
                     cpu_u = node_cpu_map.get(display_node, 0.01)
                     if phase == "Running":
-                        base_rps = 250
-                        if _active_scenario["type"] == "rps_spike" and _active_scenario["target"] and _active_scenario["target"] in pod_name and time.time() < _active_scenario["expiry"]:
-                            rps = _active_scenario["value"]
-                        else:
-                            rps = base_rps
+                        rps = 250
                     else:
                         rps = 0
                     queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - cpu_u, 0.05))
@@ -192,6 +191,8 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     "sla_ms": sla_ms,
                     "p99_ms": p99_ms,
                     "rps": rps,
+                    "net_rx_bps": int(rps * 1250 * random.uniform(0.9, 1.1)) if phase == "Running" else 0,
+                    "net_tx_bps": int(rps * 45000 * random.uniform(0.9, 1.1)) if phase == "Running" else 0,
                     "last_moved": int(time.time()) - 120
                 }
     except Exception:
@@ -247,6 +248,9 @@ def background_telemetry_collector():
     """Asynchronous background worker with self-healing Prometheus port-forward connection."""
     global _cached_snapshot_bytes, _cached_all_nodes_bytes, _cached_pods_bytes
     
+    base_data = get_base_node_profiles()
+    _cached_all_nodes_bytes = json.dumps(base_data, indent=2).encode('utf-8')
+
     while True:
         try:
             live_nodes_info = fetch_k3s_node_info()
@@ -254,10 +258,14 @@ def background_telemetry_collector():
             cpu_query = '100 - (avg by (instance, node) (rate(node_cpu_seconds_total{mode="idle"}[6s])) * 100)'
             mem_avail_query = 'node_memory_MemAvailable_bytes'
             mem_total_query = 'node_memory_MemTotal_bytes'
+            net_rx_query = 'sum by (instance, node) (rate(node_network_receive_bytes_total{device!~"veth.*|lo|flannel.*|cni.*|docker.*|br-.*"}[6s]))'
+            net_tx_query = 'sum by (instance, node) (rate(node_network_transmit_bytes_total{device!~"veth.*|lo|flannel.*|cni.*|docker.*|br-.*"}[6s]))'
             
             cpus = query_promql(cpu_query)
             mems_avail = query_promql(mem_avail_query)
             mems_total = query_promql(mem_total_query)
+            net_rxs = query_promql(net_rx_query)
+            net_txs = query_promql(net_tx_query)
             
             real_sys_power = get_real_sysfs_power_w()
             local_proc_cpu = get_local_proc_stat_cpu_util()
@@ -297,6 +305,9 @@ def background_telemetry_collector():
                 else:
                     power_w = round(profile["idle_w"] + (profile["max_w"] - profile["idle_w"]) * cpu_u, 1)
 
+                raw_rx = net_rxs.get(node_ip, net_rxs.get(node_name, net_rxs.get(display_name, None)))
+                raw_tx = net_txs.get(node_ip, net_txs.get(node_name, net_txs.get(display_name, None)))
+
                 nodes_data[display_name] = {
                     "node_name": display_name,
                     "raw_hostname": node_name,
@@ -304,20 +315,38 @@ def background_telemetry_collector():
                     "ready": is_ready,
                     "cpu_util": round(cpu_u, 2),
                     "mem_util": round(mem_u, 2),
-                    "power_w": power_w
+                    "power_w": power_w,
+                    "prom_net_rx": raw_rx,
+                    "prom_net_tx": raw_tx
                 }
                 
-                # Apply scenario overrides to node snapshot
-                if time.time() < _active_scenario["expiry"] and _active_scenario["target"] in [node_name, display_name]:
-                    if _active_scenario["type"] == "cpu_stress":
-                        nodes_data[display_name]["cpu_cores"] = _active_scenario["value"]
-                        nodes_data[display_name]["cpu_util"] = 0.99
-                    elif _active_scenario["type"] == "power_spike":
-                        nodes_data[display_name]["power_w"] = _active_scenario["value"]
-                    elif _active_scenario["type"] == "network_degrade":
-                        nodes_data[display_name]["base_latency_ms"] = _active_scenario["value"]
-                
             live_pods = fetch_k3s_pods(node_cpu_map, live_nodes_info)
+            
+            for n_name, n_data in nodes_data.items():
+                if not n_data["ready"]:
+                    n_data["net_rx_bps"] = 0
+                    n_data["net_tx_bps"] = 0
+                    continue
+                
+                # If Prometheus actually gave us real hardware data, use it!
+                if n_data.get("prom_net_rx") is not None and n_data.get("prom_net_tx") is not None:
+                    n_data["net_rx_bps"] = int(n_data["prom_net_rx"])
+                    n_data["net_tx_bps"] = int(n_data["prom_net_tx"])
+                else:
+                    # Fallback to mathematically simulating it from the pods
+                    n_rx = 5200 # 5.2 KB/s background noise
+                    n_tx = 8400
+                    for p in live_pods.values():
+                        if p["node"] == n_name:
+                            n_rx += p["net_rx_bps"]
+                            n_tx += p["net_tx_bps"]
+                    
+                    n_data["net_rx_bps"] = int(n_rx * random.uniform(0.95, 1.05))
+                    n_data["net_tx_bps"] = int(n_tx * random.uniform(0.95, 1.05))
+                
+                # Clean up temp keys so they don't leak into the API response
+                n_data.pop("prom_net_rx", None)
+                n_data.pop("prom_net_tx", None)
             
             snapshot = {
                 "timestamp": int(time.time()),
@@ -326,19 +355,6 @@ def background_telemetry_collector():
                 "workloads": live_pods
             }
             
-            # Apply scenario overrides to base nodes config
-            base_data = get_base_node_profiles()
-            if time.time() < _active_scenario["expiry"]:
-                for dn, n_data in base_data["nodes"].items():
-                    if _active_scenario["target"] in [n_data["raw_hostname"], dn]:
-                        if _active_scenario["type"] == "cpu_stress":
-                            n_data["cpu_cores"] = _active_scenario["value"]
-                        elif _active_scenario["type"] == "power_spike":
-                            n_data["max_w"] = _active_scenario["value"]
-                        elif _active_scenario["type"] == "network_degrade":
-                            n_data["base_latency_ms"] = _active_scenario["value"]
-            
-            _cached_all_nodes_bytes = json.dumps(base_data, indent=2).encode('utf-8')
             _cached_snapshot_bytes = json.dumps(snapshot, indent=2).encode('utf-8')
             _cached_pods_bytes = json.dumps({"pods": live_pods}, indent=2).encode('utf-8')
         except Exception:
@@ -347,44 +363,7 @@ def background_telemetry_collector():
         time.sleep(0.8)
 
 class TelemetryAPIHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        global _active_scenario
-        if self.path in ["/api/v1/ddos"]:
-            scenarios = ["rps_spike", "cpu_stress", "power_spike", "network_degrade"]
-            scenario = random.choice(scenarios)
-            _active_scenario["type"] = scenario
-            _active_scenario["expiry"] = time.time() + 30
-            
-            if scenario == "rps_spike":
-                _active_scenario["target"] = random.choice(["checkout", "profile", "analytics"])
-                _active_scenario["value"] = random.randint(15000, 25000)
-            else:
-                _active_scenario["target"] = random.choice(["willson", "archlinux", "fedora", "desktop-prnd0ve"])
-                if scenario == "cpu_stress": _active_scenario["value"] = 1.0
-                elif scenario == "power_spike": _active_scenario["value"] = random.randint(200, 300)
-                elif scenario == "network_degrade": _active_scenario["value"] = random.randint(200, 400)
 
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "status": "Scenario launched",
-                "type": scenario,
-                "target": _active_scenario["target"],
-                "value": _active_scenario["value"]
-            }).encode('utf-8'))
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def do_OPTIONS(self):
-        if self.path in ["/api/v1/ddos"]:
-            self.send_response(200)
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-            self.end_headers()
 
     def do_GET(self):
         if self.path in ["/", "/snapshot", "/api/v1/snapshot"]:

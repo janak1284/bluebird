@@ -21,10 +21,17 @@ def fetch_json(url: str, timeout: float = 2.0) -> dict:
         print(f"⚠️ Telemetry fetch from {url} failed: {e}")
     return {}
 
+_cached_raw_nodes = None
+
 def collect() -> Tuple[Dict[str, Node], Dict[str, Workload], dict]:
     """Polls real Telemetry REST API server and returns (nodes, workloads, raw_snap) for Optimizer."""
+    global _cached_raw_nodes
     raw_snap = fetch_json(TELEMETRY_URL)
-    raw_nodes = fetch_json(NODES_URL).get("nodes", {})
+    
+    if _cached_raw_nodes is None:
+        _cached_raw_nodes = fetch_json(NODES_URL).get("nodes", {})
+    
+    raw_nodes = _cached_raw_nodes
     
     snap_nodes = raw_snap.get("nodes", {})
     nodes = {}
@@ -68,6 +75,14 @@ def collect() -> Tuple[Dict[str, Node], Dict[str, Workload], dict]:
             allowed_tiers = ("edge", "core")
 
         current_n = data.get("node") or data.get("raw_node") or data.get("current_node")
+        status = data.get("status", "")
+
+        # If we already recorded a Running pod for this deployment, don't let a Terminating/Offline pod overwrite it!
+        if clean_name in workloads:
+            existing = workloads[clean_name]
+            # Only overwrite if the existing one isn't the active one, or if this new one is Running
+            if hasattr(existing, '_status') and existing._status == "Running" and status != "Running":
+                continue
 
         w_obj = Workload(
             name=clean_name,
@@ -79,6 +94,7 @@ def collect() -> Tuple[Dict[str, Node], Dict[str, Workload], dict]:
             last_moved=float(data.get("last_moved", 0.0)),
             size_units=float(data.get("size_units", 1.0))
         )
+        w_obj._status = status  # hidden attribute just for tracking during this loop
         workloads[clean_name] = w_obj
 
     return nodes, workloads, raw_snap
@@ -94,8 +110,17 @@ def measured() -> Dict[str, dict]:
             if raw_name.startswith(prefix):
                 clean_name = prefix
                 break
-        metrics[clean_name] = {
-            "p99_ms": float(data.get("p99_ms", data.get("sla_ms", 50.0))),
-            "rps": float(data.get("rps", 100.0))
-        }
+        if clean_name not in metrics:
+            metrics[clean_name] = {
+                "p99_ms": float(data.get("p99_ms", data.get("sla_ms", 50.0))),
+                "rps": float(data.get("rps", 100.0)),
+                "net_rx_bps": float(data.get("net_rx_bps", 0.0)),
+                "net_tx_bps": float(data.get("net_tx_bps", 0.0))
+            }
+        else:
+            metrics[clean_name]["rps"] += float(data.get("rps", 0.0))
+            metrics[clean_name]["net_rx_bps"] += float(data.get("net_rx_bps", 0.0))
+            metrics[clean_name]["net_tx_bps"] += float(data.get("net_tx_bps", 0.0))
+            metrics[clean_name]["p99_ms"] = max(metrics[clean_name]["p99_ms"], float(data.get("p99_ms", 0.0)))
+
     return metrics
