@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+pareto-env/
+*.log
+nohup.out
+.env
+kubeconfig
+*.kubeconfig
+results/*.csv
+.DS_Store
+
+# Teammate is working on this, ignore local stub
+controller/telemetry.py
+
+# Ignore blueprint documents and screenshots
+image.png
+blueprint_text.txt
+PS-S04_Blueprint_v2.docx
