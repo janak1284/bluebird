@@ -1,0 +1,207 @@
+# testable_workloads.yaml
+# Production Microservices with Clean JSON Output
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-critical-01
+  namespace: default
+  labels:
+    app: checkout-app
+    workload-class: latency-critical
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: checkout-app
+  template:
+    metadata:
+      labels:
+        app: checkout-app
+        workload-class: latency-critical
+    spec:
+      nodeName: willson  # Core Master Node
+      containers:
+      - name: checkout-api
+        image: python:3.11-slim
+        command:
+        - python3
+        - -c
+        - |
+          import json, os, time
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Access-Control-Allow-Origin", "*")
+                  self.end_headers()
+                  res = {
+                      "status": "Order Placed Successfully",
+                      "service": "checkout-critical-01",
+                      "sla_ms": 20,
+                      "class": "latency-critical",
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
+                      "timestamp": int(time.time())
+                  }
+                  self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
+              def log_message(self, format, *args): pass
+          HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+        env:
+        - name: MY_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-profile-std-01
+  namespace: default
+  labels:
+    app: user-profile-app
+    workload-class: standard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-profile-app
+  template:
+    metadata:
+      labels:
+        app: user-profile-app
+        workload-class: standard
+    spec:
+      nodeName: willson  # Core Master Node
+      containers:
+      - name: user-profile-api
+        image: python:3.11-slim
+        command:
+        - python3
+        - -c
+        - |
+          import json, os, time
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Access-Control-Allow-Origin", "*")
+                  self.end_headers()
+                  res = {
+                      "status": "User Profile Loaded",
+                      "service": "user-profile-std-01",
+                      "sla_ms": 100,
+                      "class": "standard",
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
+                      "timestamp": int(time.time())
+                  }
+                  self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
+              def log_message(self, format, *args): pass
+          HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+        env:
+        - name: MY_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-batch-01
+  namespace: default
+  labels:
+    app: analytics-app
+    workload-class: batch-analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-app
+  template:
+    metadata:
+      labels:
+        app: analytics-app
+        workload-class: batch-analytics
+    spec:
+      nodeName: willson  # Core Master Node
+      containers:
+      - name: analytics-api
+        image: python:3.11-slim
+        command:
+        - python3
+        - -c
+        - |
+          import json, os, time
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Access-Control-Allow-Origin", "*")
+                  self.end_headers()
+                  res = {
+                      "status": "Analytics Job Computed",
+                      "service": "analytics-batch-01",
+                      "sla_ms": 500,
+                      "class": "batch-analytics",
+                      "served_by_node": os.environ.get("MY_NODE", "willson"),
+                      "timestamp": int(time.time())
+                  }
+                  self.wfile.write(json.dumps(res, indent=2).encode('utf-8'))
+              def log_message(self, format, *args): pass
+          HTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+        env:
+        - name: MY_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - containerPort: 8080
+---
+# Dual-Mode Kubernetes NodePort Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: checkout-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-profile-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: user-profile-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: analytics-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30083

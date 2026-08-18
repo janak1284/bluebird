@@ -1,0 +1,92 @@
+# Workloads Manifest for PS4 Cluster
+# Deploys pods onto each node with specific workload classes
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: user-profile-std-01
+  namespace: default
+  labels:
+    app: user-profile
+    workload-class: standard
+spec:
+  nodeName: fedora  # Edge Node (low latency, high cost)
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: checkout-critical-01
+  namespace: default
+  labels:
+    app: checkout
+    workload-class: latency-critical
+spec:
+  nodeName: fedora  # Edge Node
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: analytics-batch-01
+  namespace: default
+  labels:
+    app: analytics
+    workload-class: batch-analytics
+spec:
+  nodeName: willson  # Core Master Node
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: analytics-batch-02
+  namespace: default
+  labels:
+    app: analytics
+    workload-class: batch-analytics
+spec:
+  nodeName: archlinux  # Core Node 1
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: analytics-batch-03
+  namespace: default
+  labels:
+    app: analytics
+    workload-class: batch-analytics
+spec:
+  nodeName: desktop-prnd0ve  # Core Node 2 (WSL)
+  containers:
+  - name: app
+    image: nginx:alpine
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
