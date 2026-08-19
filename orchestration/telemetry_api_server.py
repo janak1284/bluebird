@@ -15,10 +15,10 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Node Profiles Configuration (PS-S04 Blueprint Section 4)
 NODE_PROFILES = {
-    "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 40, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
-    "archlinux":    {"alias": "edge-node-03", "tier": "edge", "zone": "edge-3", "base_latency_ms": 5, "cost_per_hr": 12.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
-    "fedora":       {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 4,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
-    "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 3,  "cost_per_hr": 6.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
+    "willson":       {"alias": "core-master",  "tier": "core", "zone": "core-1", "base_latency_ms": 800, "cost_per_hr": 2.0, "idle_w": 7.5, "max_w": 30,  "cpu_cores": 16, "total_mem_gb": 16},
+    "archlinux":    {"alias": "edge-node-03", "tier": "edge", "zone": "edge-3", "base_latency_ms": 600, "cost_per_hr": 12.0, "idle_w": 25.0, "max_w": 135, "cpu_cores": 12, "total_mem_gb": 8},
+    "fedora":       {"alias": "edge-node-01", "tier": "edge", "zone": "edge-1", "base_latency_ms": 500,  "cost_per_hr": 9.0, "idle_w": 12.0, "max_w": 45,  "cpu_cores": 8,  "total_mem_gb": 8},
+    "desktop-prnd0ve": {"alias": "edge-node-02", "tier": "edge", "zone": "edge-2", "base_latency_ms": 450,  "cost_per_hr": 6.0, "idle_w": 8.0,  "max_w": 35,  "cpu_cores": 8,  "total_mem_gb": 16},
 }
 
 PROMETHEUS_URL = "http://localhost:9090/api/v1/query"
@@ -130,7 +130,11 @@ def fetch_k3s_node_info():
         pass
     return nodes
 
+_pod_last_node = {}
+_pod_last_moved = {}
+
 def fetch_k3s_pods(node_cpu_map, live_nodes_info):
+    global _pod_last_node, _pod_last_moved
     pods = {}
     try:
         cmd = ["kubectl", "get", "pods", "-n", "default", "-o", "json"]
@@ -162,11 +166,13 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                         app_class = "batch-analytics"
                 
                 sla_map = {
-                    "latency-critical": 20,
-                    "standard": 100,
-                    "batch-analytics": 500
+                    "latency-critical": 1000,
+                    "standard": 2000,
+                    "batch-analytics": 4000
                 }
                 sla_ms = sla_map.get(app_class, 100)
+                
+                pod_ip = item['status'].get('podIP')
                 
                 if not is_node_ready:
                     effective_status = "NodeOffline"
@@ -174,13 +180,34 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     rps = 0
                 else:
                     effective_status = phase
-                    cpu_u = node_cpu_map.get(display_node, 0.01)
                     if phase == "Running":
                         rps = 250
+                        
+                        # Real Empirical Latency Measurement via Router
+                        real_rtt = base_lat
+                        router_host = os.environ.get("ROUTER_IP", "10.243.176.77") + ":8000"
+                        ep_map = {"checkout": "/checkout", "profile": "/user-profile", "analytics": "/analytics"}
+                        
+                        ep = None
+                        for k, v in ep_map.items():
+                            if k in pod_name:
+                                ep = v
+                                break
+                                
+                        if ep:
+                            try:
+                                t0 = time.time()
+                                req = urllib.request.Request(f"http://{router_host}{ep}", headers={'User-Agent': 'TelemetryProbe/1.0'})
+                                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                                    if resp.status == 200:
+                                        real_rtt = (time.time() - t0) * 1000.0
+                            except Exception:
+                                pass
+                        
+                        p99_ms = round(real_rtt, 1)
                     else:
                         rps = 0
-                    queuing_delay = (rps / 100.0) * (1.0 / max(1.0 - cpu_u, 0.05))
-                    p99_ms = round(base_lat + queuing_delay, 1) if phase == "Running" else 0.0
+                        p99_ms = 0.0
                 
                 pods[pod_name] = {
                     "pod_name": pod_name,
@@ -193,8 +220,29 @@ def fetch_k3s_pods(node_cpu_map, live_nodes_info):
                     "rps": rps,
                     "net_rx_bps": int(rps * 1250 * random.uniform(0.9, 1.1)) if phase == "Running" else 0,
                     "net_tx_bps": int(rps * 45000 * random.uniform(0.9, 1.1)) if phase == "Running" else 0,
-                    "last_moved": int(time.time()) - 120
+                    "last_moved": int(time.time()) - 120  # Temporary, overwritten below
                 }
+                
+            for clean_name in ["checkout-critical-01", "user-profile-std-01", "analytics-batch-01"]:
+                # Find the running pod for this deployment to track its node
+                active_node = None
+                for p_name, p_data in pods.items():
+                    if p_name.startswith(clean_name) and p_data["status"] == "Running":
+                        active_node = p_data["node"]
+                        break
+                        
+                if active_node:
+                    prev_node = _pod_last_node.get(clean_name)
+                    if prev_node and prev_node != active_node:
+                        _pod_last_moved[clean_name] = time.time()
+                    _pod_last_node[clean_name] = active_node
+                    
+                # Update last_moved for all pods in this deployment
+                lm = _pod_last_moved.get(clean_name, time.time() - 120)
+                for p_name, p_data in pods.items():
+                    if p_name.startswith(clean_name):
+                        p_data["last_moved"] = int(lm)
+                        
     except Exception:
         pass
     return pods
@@ -360,7 +408,7 @@ def background_telemetry_collector():
         except Exception:
             pass
             
-        time.sleep(0.8)
+        time.sleep(5.0)
 
 class TelemetryAPIHandler(BaseHTTPRequestHandler):
 

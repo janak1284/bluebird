@@ -535,12 +535,6 @@
                                 <span class="font-semibold">${escapeHtml(w.name)}</span>
                                 <span class="opacity-80">· ${w.p99_ms}ms</span>
                             </div>
-                            <div class="mt-0.5">
-                                <select class="manual-migrate-select text-[9px] py-0 px-1 border border-outline-variant/50 rounded bg-white/50 hover:bg-white text-on-surface w-full cursor-pointer focus:ring-0 outline-none" onchange="manualMigrate('${w.name}', this.value); this.value=''">
-                                    <option value="" disabled selected>Move to...</option>
-                                    ${Object.keys(data.nodes).filter(n => n !== nodeName && data.nodes[n].ready).map(n => `<option value="${n}">${n}</option>`).join('')}
-                                </select>
-                            </div>
                         </div>
                     `;
                 }).join('');

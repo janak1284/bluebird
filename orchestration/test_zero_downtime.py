@@ -7,8 +7,15 @@ import json
 import threading
 import urllib.request
 import subprocess
+import os
 
-TARGET_URL = "http://localhost:8000/checkout"
+ROUTER_HOST = os.environ.get("ROUTER_IP", "10.243.176.77") + ":8000"
+
+TARGET_ENDPOINTS = [
+    {"name": "checkout-critical-01", "url": f"http://{ROUTER_HOST}/checkout"},
+    {"name": "user-profile-std-01", "url": f"http://{ROUTER_HOST}/user-profile"},
+    {"name": "analytics-batch-01", "url": f"http://{ROUTER_HOST}/analytics"}
+]
 
 # Global Test Counters
 running = True
@@ -18,11 +25,11 @@ failed_requests = 0
 nodes_seen = set()
 latencies_ms = []
 
-def continuous_traffic_generator():
+def continuous_traffic_generator(url, name):
     """Sends 10 HTTP requests per second (every 100ms) with fast connection reuse."""
     global total_requests, successful_requests, failed_requests, nodes_seen, latencies_ms, running
     
-    print(f"📡 Launching Continuous Traffic Generator (10 Req/Sec) against {TARGET_URL}...\n")
+    print(f"📡 Launching Traffic Generator (10 Req/Sec) against {url}...\n")
     
     # HTTP Keep-Alive opener for persistent socket reuse
     opener = urllib.request.build_opener()
@@ -34,7 +41,7 @@ def continuous_traffic_generator():
         
         for attempt in range(2):
             try:
-                req = urllib.request.Request(TARGET_URL, headers={
+                req = urllib.request.Request(url, headers={
                     'User-Agent': 'ZeroDowntimeTester/1.0',
                     'Connection': 'keep-alive'
                 })
@@ -47,7 +54,7 @@ def continuous_traffic_generator():
                         data = json.loads(resp.read().decode('utf-8'))
                         node = data.get("served_by_node", "unknown")
                         nodes_seen.add(node)
-                        print(f"  [Req #{total_requests:03d}] 200 OK | Node: {node:<10} | RTT: {rtt:>5.1f}ms | Status: ✅ SUCCESS")
+                        print(f"  [{name}] 200 OK | Node: {node:<10} | RTT: {rtt:>5.1f}ms | Status: ✅ SUCCESS")
                         success = True
                         break
             except Exception:
@@ -63,26 +70,38 @@ def continuous_traffic_generator():
 def run_zero_downtime_test(target_node="fedora"):
     global running
     
-    # 1. Start Background Traffic Generator
-    traffic_thread = threading.Thread(target=continuous_traffic_generator, daemon=True)
-    traffic_thread.start()
+    # 1. Start Background Traffic Generators for all endpoints
+    threads = []
+    for ep in TARGET_ENDPOINTS:
+        t = threading.Thread(target=continuous_traffic_generator, args=(ep["url"], ep["name"]), daemon=True)
+        t.start()
+        threads.append(t)
     
     time.sleep(2.0)
     
     print("\n" + "="*60)
-    print(f"🔥 TRIGGERING LIVE MAKE-BEFORE-BREAK POD MIGRATION TO '{target_node}'")
+    print(f"🔥 TRIGGERING LIVE MAKE-BEFORE-BREAK POD MIGRATIONS TO '{target_node}'")
     print("="*60 + "\n")
     
-    # 2. Trigger scheduler.py migration in mid-flight
+    # 2. Trigger scheduler.py migration in mid-flight for all endpoints
     t_mig_start = time.time()
-    cmd = ["python3", "/home/mukes/dev/yakathon/scheduler.py", "checkout-critical-01", target_node]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    t_mig_end = time.time()
     
-    print("\n" + "="*60)
-    print("📋 MIGRATION SCRIPT OUTPUT:")
-    print("="*60)
-    print(res.stdout)
+    mig_threads = []
+    def migrate_wl(wl_name):
+        cmd = ["python3", "orchestration/scheduler.py", wl_name, target_node]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(f"\n📋 MIGRATION SCRIPT OUTPUT FOR {wl_name}:")
+        print(res.stdout)
+
+    for ep in TARGET_ENDPOINTS:
+        mt = threading.Thread(target=migrate_wl, args=(ep["name"],))
+        mt.start()
+        mig_threads.append(mt)
+        
+    for mt in mig_threads:
+        mt.join()
+        
+    t_mig_end = time.time()
     print("="*60 + "\n")
     
     time.sleep(3.0)

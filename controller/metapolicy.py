@@ -24,7 +24,7 @@ _pending_since = 0.0
 def _log(msg: str):
     print(f"[META] {msg}")
     ts = datetime.utcnow().strftime('%H:%M:%S')
-    state.EVENTS.appendleft(f"[{ts}] AUTO: {msg}")
+    state.EVENTS.append(f"[{ts}] AUTO: {msg}")
 
 def evaluate_meta_policy(nodes: Dict[str, Node], workloads: Dict[str, Workload]) -> str:
     global _current_policy, _pending_policy, _pending_since

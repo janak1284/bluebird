@@ -150,6 +150,22 @@ def api_update_policy(payload: PolicyUpdate):
     state.TARGET_POLICY_MODE = payload.policy
     return {"status": "ok", "policy": payload.policy}
 
+class MigrateUpdate(BaseModel):
+    workload: str
+    target_node: str
+
+@router.post("/api/migrate")
+def api_migrate(payload: MigrateUpdate):
+    import subprocess
+    from datetime import datetime
+    env = os.environ.copy()
+    env["ROUTER_IP"] = "10.243.176.77"
+    subprocess.Popen(["python3", "orchestration/scheduler.py", payload.workload, payload.target_node], env=env)
+    
+    ts = datetime.utcnow().strftime('%H:%M:%S')
+    state.EVENTS.append(f"[{ts}] MANUAL: Triggered CLI migration of {payload.workload} -> {payload.target_node}")
+    return {"status": "ok"}
+
 
 @router.get("/")
 def index():
