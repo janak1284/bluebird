@@ -52,11 +52,15 @@ def build_snapshot(nodes: Dict[str, Node],
         m_util = round(min(0.2 + util[name] * 0.5, 0.95), 3)
         p_w = round(node_power(n, util[name]), 1)
 
+        n_rx = 0
+        n_tx = 0
         if raw_snapshot and "nodes" in raw_snapshot and name in raw_snapshot["nodes"]:
             raw_n = raw_snapshot["nodes"][name]
             if "cpu_util" in raw_n: c_util = raw_n["cpu_util"]
             if "mem_util" in raw_n: m_util = raw_n["mem_util"]
             if "power_w" in raw_n: p_w = raw_n["power_w"]
+            if "net_rx_bps" in raw_n: n_rx = raw_n["net_rx_bps"]
+            if "net_tx_bps" in raw_n: n_tx = raw_n["net_tx_bps"]
 
         nodes_out[name] = {
             "tier": n.tier,
@@ -69,6 +73,8 @@ def build_snapshot(nodes: Dict[str, Node],
             "power_w": p_w,
             "cost_per_hr": n.cost_per_hr,
             "cpu_cores": n.cores,
+            "net_rx_bps": n_rx,
+            "net_tx_bps": n_tx,
         }
 
     workloads_out = {}
@@ -82,6 +88,8 @@ def build_snapshot(nodes: Dict[str, Node],
             "class": "latency-critical" if w.allowed_tiers == ("edge",)
                      else ("batch" if w.sla_ms >= 200 else "standard"),
             "last_moved": w.last_moved,
+            "net_rx_bps": 0,
+            "net_tx_bps": 0,
         }
 
     front_out = []
@@ -142,40 +150,22 @@ def explain_migration(w_name: str, src: str, dst: str,
 
 def get_snapshot() -> dict:
     try:
+        telemetry_url = os.getenv("TELEMETRY_URL", "http://localhost:8080/api/v1/snapshot")
         result = subprocess.check_output(
-            ["curl", "-s", "http://10.243.176.184:8080/api/v1/snapshot"],
+            ["curl", "-s", telemetry_url],
             timeout=10
         )
         snapshot = json.loads(result.decode('utf-8'))
-        
-        if not snapshot.get("workloads"):
-            snapshot["workloads"] = {
-                "checkout": {"rps": 340, "cores_per_rps": 0.005, "sla_ms": 20, "allowed_tiers": ["edge"], "current_node": "edge-node-02", "last_moved": 0},
-                "recommend": {"rps": 100, "cores_per_rps": 0.002, "sla_ms": 80, "allowed_tiers": ["edge", "core"], "current_node": "core-master", "last_moved": 0},
-                "analytics": {"rps": 50, "cores_per_rps": 0.01, "sla_ms": 500, "allowed_tiers": ["core"], "current_node": "core-master", "last_moved": 0}
-            }
         return snapshot
     except Exception as e:
-        print(f"Warning: Could not fetch from API via curl ({e}). Using fallback snapshot.")
-        return {
-            "timestamp": time.time(),
-            "nodes": {
-                "core-master": {"tier": "core", "zone": "core-1", "cpu_cores": 16.0, "base_latency_ms": 40.0, "idle_w": 7.5, "max_w": 30.0, "cost_per_hr": 2.0, "ready": True, "raw_hostname": "willson"},
-                "core-node-01": {"tier": "core", "zone": "core-2", "cpu_cores": 12.0, "base_latency_ms": 42.0, "idle_w": 25.0, "max_w": 135.0, "cost_per_hr": 2.1, "ready": True, "raw_hostname": "archlinux"},
-                "edge-node-01": {"tier": "edge", "zone": "edge-1", "cpu_cores": 8.0, "base_latency_ms": 4.0, "idle_w": 12.0, "max_w": 45.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "fedora"},
-                "edge-node-02": {"tier": "edge", "zone": "edge-2", "cpu_cores": 8.0, "base_latency_ms": 3.0, "idle_w": 8.0, "max_w": 35.0, "cost_per_hr": 9.0, "ready": True, "raw_hostname": "desktop-prnd0ve"}
-            },
-            "workloads": {
-                "checkout": {"rps": 340, "cores_per_rps": 0.005, "sla_ms": 20, "allowed_tiers": ["edge"], "current_node": "edge-node-02", "last_moved": 0},
-                "recommend": {"rps": 100, "cores_per_rps": 0.002, "sla_ms": 80, "allowed_tiers": ["edge", "core"], "current_node": "core-master", "last_moved": 0},
-                "analytics": {"rps": 50, "cores_per_rps": 0.01, "sla_ms": 500, "allowed_tiers": ["core"], "current_node": "core-master", "last_moved": 0}
-            }
-        }
+        print(f"Warning: Could not fetch from API via curl ({e}). Returning empty snapshot.")
+        return {}
 
 def get_static_nodes() -> dict:
     try:
+        nodes_url = os.getenv("NODES_URL", "http://localhost:8080/api/v1/all-nodes")
         result = subprocess.check_output(
-            ["curl", "-s", "http://10.243.176.184:8080/api/v1/all-nodes"],
+            ["curl", "-s", nodes_url],
             timeout=10
         )
         data = json.loads(result.decode('utf-8'))
@@ -196,7 +186,7 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
         idle_w = static.get("idle_w") or data.get("idle_w") or (12.0 if is_edge else 25.0)
         max_w = static.get("max_w") or data.get("max_w") or (45.0 if is_edge else 65.0)
         
-        n = Node(name=name, raw_hostname=data.get("raw_hostname", ""), tier=tier, cores=cores, base_latency_ms=base_lat, cost_per_hr=cost, idle_w=idle_w, max_w=max_w, ready=data.get("ready", True))
+        n = Node(name=name, raw_hostname=data.get("raw_hostname", ""), tier=tier, cores=cores, base_latency_ms=base_lat, cost_per_hr=cost, idle_w=idle_w, max_w=max_w, ready=data.get("ready", True), current_power_w=data.get("power_w", idle_w))
         n.zone = static.get("zone") or data.get("zone") or tier
         nodes[name] = n
     workloads = {
@@ -219,7 +209,9 @@ def parse_snapshot(snapshot: dict, static_nodes: dict) -> Tuple[Dict[str, Node],
 def run(collect: Optional[Callable[[], tuple]] = None,
         migrate: Optional[Callable[[str, str, str], None]] = None,
         period: float = CONTROL_PERIOD_S,
-        stop: Optional[Callable[[], bool]] = None) -> None:
+        stop: Optional[Callable[[], bool]] = None,
+        measured: Optional[Callable] = None,
+        **kwargs) -> None:
     static_nodes = {}
     if not collect:
         static_nodes = get_static_nodes()
@@ -229,7 +221,11 @@ def run(collect: Optional[Callable[[], tuple]] = None,
             mode = getattr(state, "TARGET_POLICY_MODE", "sla-first")
             raw_snapshot = None
             if collect:
-                nodes, workloads = collect()
+                collect_res = collect()
+                if len(collect_res) == 3:
+                    nodes, workloads, raw_snapshot = collect_res
+                else:
+                    nodes, workloads = collect_res
             else:
                 raw_snapshot = get_snapshot()
                 nodes, workloads = parse_snapshot(raw_snapshot, static_nodes)
@@ -248,6 +244,19 @@ def run(collect: Optional[Callable[[], tuple]] = None,
             snapshot = build_snapshot(nodes, workloads, placement,
                                       front, objs, policy, raw_snapshot=raw_snapshot)
             snapshot["policy_mode"] = mode
+            if measured:
+                try:
+                    real_metrics = measured()
+                    for w_name, mets in real_metrics.items():
+                        if w_name in snapshot["workloads"]:
+                            snapshot["workloads"][w_name]["p99_ms"] = mets.get("p99_ms", snapshot["workloads"][w_name]["p99_ms"])
+                            snapshot["workloads"][w_name]["rps"] = mets.get("rps", snapshot["workloads"][w_name]["rps"])
+                            if "net_rx_bps" in mets:
+                                snapshot["workloads"][w_name]["net_rx_bps"] = mets["net_rx_bps"]
+                            if "net_tx_bps" in mets:
+                                snapshot["workloads"][w_name]["net_tx_bps"] = mets["net_tx_bps"]
+                except Exception as e:
+                    print(f"Failed to fetch measured telemetry: {e}")
 
             # diff against reality to find what needs to move
             events = []
